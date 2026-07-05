@@ -1,0 +1,443 @@
+// آکادمی توانمندسازی آرتا — Prisma schema (MySQL)
+// Docs: https://pris.ly/d/prisma-schema
+// The human-readable design lives in docs/database.schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// Access level for management panel accounts.
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+}
+
+/// Fixed service categories (matches the frontend `ServiceCategory` union).
+enum ServiceCategory {
+  INDIVIDUAL
+  COUPLE
+  ORGANIZATIONAL
+  EDUCATIONAL
+}
+
+/// Delivery format of an educational package.
+enum ProductFileType {
+  PDF
+  VIDEO
+  MIXED
+}
+
+/// Lifecycle of a purchase / mock payment.
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+/// Lifecycle of a counseling appointment.
+enum AppointmentStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+/// Fixed daily counseling time slots (08:00–14:00, one-hour blocks).
+enum AppointmentSlot {
+  SLOT_08_09
+  SLOT_09_10
+  SLOT_10_11
+  SLOT_11_12
+  SLOT_12_13
+  SLOT_13_14
+}
+
+/// Triage state of a contact-form submission.
+enum ContactStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & accounts
+// ---------------------------------------------------------------------------
+
+/// Management-panel account. Authenticates with mobile + password.
+model Admin {
+  id           String    @id @default(uuid())
+  name         String    @db.VarChar(100)
+  email        String    @unique @db.VarChar(191)
+  mobile       String    @unique @db.VarChar(15)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         AdminRole @default(ADMIN)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@index([deletedAt])
+  @@map("admins")
+}
+
+/// End user account. Authenticates with mobile + password.
+model User {
+  id           String    @id @default(uuid())
+  name         String    @db.VarChar(100)
+  mobile       String    @unique @db.VarChar(15)
+  email        String?   @unique @db.VarChar(191)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  appointments Appointment[]
+  purchases    Purchase[]
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog: services
+// ---------------------------------------------------------------------------
+
+/// Counseling / training service offered by the academy.
+model Service {
+  id               String          @id @default(uuid())
+  slug             String          @unique @db.VarChar(191)
+  title            String          @db.VarChar(191)
+  shortDescription String          @map("short_description") @db.VarChar(500)
+  fullDescription  String          @map("full_description") @db.Text
+  category         ServiceCategory
+  icon             String          @db.VarChar(100)
+  image            String?         @db.VarChar(500)
+  sortOrder        Int             @default(0) @map("sort_order")
+  isPublished      Boolean         @default(true) @map("is_published")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("services")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog: educational products / packages
+// ---------------------------------------------------------------------------
+
+/// Dynamic, admin-managed product category (e.g. «مدیریت استرس»).
+model ProductCategory {
+  id        String    @id @default(uuid())
+  slug      String    @unique @db.VarChar(191)
+  name      String    @db.VarChar(100)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+/// Educational package / digital product (PDF, video, or mixed).
+model Product {
+  id               String          @id @default(uuid())
+  slug             String          @unique @db.VarChar(191)
+  title            String          @db.VarChar(191)
+  shortDescription String          @map("short_description") @db.VarChar(500)
+  fullDescription  String          @map("full_description") @db.Text
+  image            String          @db.VarChar(500)
+  fileType         ProductFileType @map("file_type")
+  fileUrl          String          @map("file_url") @db.VarChar(500)
+  /// Price in Toman. NULL = free package.
+  price            Int?
+  /// Discounted price in Toman (must be < price when set).
+  discountPrice    Int?            @map("discount_price")
+  isFeatured       Boolean         @default(false) @map("is_featured")
+  isPublished      Boolean         @default(true) @map("is_published")
+  categoryId       String          @map("category_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+
+  category  ProductCategory  @relation(fields: [categoryId], references: [id])
+  chapters  ProductChapter[]
+  purchases Purchase[]
+
+  @@index([categoryId])
+  @@index([isFeatured])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+/// Ordered syllabus chapter belonging to a product.
+model ProductChapter {
+  id        String @id @default(uuid())
+  productId String @map("product_id")
+  title     String @db.VarChar(255)
+  sortOrder Int    @default(0) @map("sort_order")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_chapters")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog: portfolio
+// ---------------------------------------------------------------------------
+
+/// Dynamic portfolio category (e.g. «سازمانی»، «فردی»، «کارگاه»).
+model PortfolioCategory {
+  id        String   @id @default(uuid())
+  slug      String   @unique @db.VarChar(191)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items PortfolioItem[]
+
+  @@map("portfolio_categories")
+}
+
+/// Portfolio / case-study showcase item.
+model PortfolioItem {
+  id               String    @id @default(uuid())
+  slug             String    @unique @db.VarChar(191)
+  title            String    @db.VarChar(191)
+  shortDescription String    @map("short_description") @db.VarChar(500)
+  fullDescription  String    @map("full_description") @db.Text
+  image            String    @db.VarChar(500)
+  year             Int?
+  client           String?   @db.VarChar(191)
+  categoryId       String    @map("category_id")
+  sortOrder        Int       @default(0) @map("sort_order")
+  isPublished      Boolean   @default(true) @map("is_published")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  category PortfolioCategory @relation(fields: [categoryId], references: [id])
+  gallery  PortfolioImage[]
+
+  @@index([categoryId])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("portfolio_items")
+}
+
+/// Additional gallery image attached to a portfolio item.
+model PortfolioImage {
+  id              String @id @default(uuid())
+  portfolioItemId String @map("portfolio_item_id")
+  url             String @db.VarChar(500)
+  sortOrder       Int    @default(0) @map("sort_order")
+
+  portfolioItem PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioItemId])
+  @@map("portfolio_images")
+}
+
+// ---------------------------------------------------------------------------
+// Content: blog
+// ---------------------------------------------------------------------------
+
+/// Dynamic blog category (e.g. «روانشناسی»، «رشد فردی»).
+model BlogCategory {
+  id        String   @id @default(uuid())
+  slug      String   @unique @db.VarChar(191)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  posts BlogPost[]
+
+  @@map("blog_categories")
+}
+
+/// Blog article.
+model BlogPost {
+  id          String    @id @default(uuid())
+  slug        String    @unique @db.VarChar(191)
+  title       String    @db.VarChar(191)
+  excerpt     String    @db.VarChar(500)
+  content     String    @db.LongText
+  image       String    @db.VarChar(500)
+  author      String    @db.VarChar(100)
+  /// Estimated reading time in minutes.
+  readTime    Int       @map("read_time")
+  publishedAt DateTime  @map("published_at")
+  isPublished Boolean   @default(true) @map("is_published")
+  categoryId  String    @map("category_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  category BlogCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([publishedAt])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("blog_posts")
+}
+
+// ---------------------------------------------------------------------------
+// Commerce: purchases
+// ---------------------------------------------------------------------------
+
+/// A user's ownership of a product (free claim or paid purchase).
+model Purchase {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  productId   String         @map("product_id")
+  /// Amount actually paid in Toman. NULL = free claim.
+  pricePaid   Int?           @map("price_paid")
+  status      PurchaseStatus @default(COMPLETED)
+  purchasedAt DateTime       @default(now()) @map("purchased_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@map("purchases")
+}
+
+// ---------------------------------------------------------------------------
+// Commerce: appointments
+// ---------------------------------------------------------------------------
+
+/// Booked in-person counseling appointment.
+///
+/// Business rule: a given (date, slot) may only have ONE active
+/// (CONFIRMED/COMPLETED) appointment. Because a CANCELLED slot must become
+/// re-bookable and MySQL lacks partial unique indexes, this uniqueness is
+/// enforced in the application layer, backed by the [date, slot] index below.
+model Appointment {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  date      DateTime          @db.Date
+  slot      AppointmentSlot
+  status    AppointmentStatus @default(CONFIRMED)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([date, slot])
+  @@index([status])
+  @@map("appointments")
+}
+
+// ---------------------------------------------------------------------------
+// Content: marketing & support
+// ---------------------------------------------------------------------------
+
+/// Frequently asked question.
+model Faq {
+  id          String   @id @default(uuid())
+  question    String   @db.VarChar(500)
+  answer      String   @db.Text
+  category    String   @db.VarChar(100)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isPublished])
+  @@map("faqs")
+}
+
+/// Academy team member / consultant profile.
+model TeamMember {
+  id           String   @id @default(uuid())
+  name         String   @db.VarChar(100)
+  role         String   @db.VarChar(150)
+  bio          String   @db.Text
+  image        String   @db.VarChar(500)
+  isManagement Boolean  @default(false) @map("is_management")
+  sortOrder    Int      @default(0) @map("sort_order")
+  isPublished  Boolean  @default(true) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([isManagement])
+  @@map("team_members")
+}
+
+/// Client testimonial shown on the homepage.
+model Testimonial {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(100)
+  role        String   @db.VarChar(150)
+  content     String   @db.Text
+  /// 1–5 star rating.
+  rating      Int      @default(5)
+  isPublished Boolean  @default(true) @map("is_published")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("testimonials")
+}
+
+/// Homepage trust statistic (e.g. «مراجع راضی» → «۲,۵۰۰+»).
+model SiteStat {
+  id        String   @id @default(uuid())
+  label     String   @db.VarChar(100)
+  value     String   @db.VarChar(50)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_stats")
+}
+
+/// Generic key/value site setting (contact info, social links, etc.).
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+/// Contact-form submission (lead).
+model ContactSubmission {
+  id        String        @id @default(uuid())
+  name      String        @db.VarChar(100)
+  mobile    String        @db.VarChar(15)
+  subject   String        @db.VarChar(191)
+  message   String?       @db.Text
+  status    ContactStatus @default(NEW)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("contact_submissions")
+}

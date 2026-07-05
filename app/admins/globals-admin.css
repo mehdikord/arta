@@ -1,0 +1,85 @@
+/* Admin panel design tokens — scoped under .admin-panel */
+
+.admin-panel {
+  --admin-sidebar-bg: #1e1e2d;
+  --admin-sidebar-bg-hover: #2a2a3c;
+  --admin-sidebar-text: #9899ac;
+  --admin-sidebar-text-hover: #f5f5f5;
+  --admin-sidebar-active-bg: rgba(54, 153, 255, 0.12);
+  --admin-sidebar-active-text: #3699ff;
+  --admin-sidebar-active-border: #3699ff;
+  --admin-sidebar-border: rgba(255, 255, 255, 0.06);
+  --admin-content-bg: #f1f5f9;
+  --admin-topbar-bg: rgba(255, 255, 255, 0.88);
+  --admin-sidebar-width: 260px;
+  --admin-sidebar-collapsed-width: 72px;
+  --admin-accent: #3699ff;
+}
+
+.admin-panel .admin-sidebar {
+  background-color: var(--admin-sidebar-bg);
+  color: var(--admin-sidebar-text);
+}
+
+.admin-panel .admin-topbar {
+  background-color: var(--admin-topbar-bg);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.admin-panel .admin-content {
+  background-color: var(--admin-content-bg);
+}
+
+.admin-panel .admin-nav-item {
+  color: var(--admin-sidebar-text);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.admin-panel .admin-nav-item:hover:not(:disabled) {
+  background-color: var(--admin-sidebar-bg-hover);
+  color: var(--admin-sidebar-text-hover);
+}
+
+.admin-panel .admin-nav-item[data-active="true"] {
+  background-color: var(--admin-sidebar-active-bg);
+  color: var(--admin-sidebar-active-text);
+  border-inline-start: 3px solid var(--admin-sidebar-active-border);
+}
+
+/* Tables — RTL alignment (actions column centered) */
+.admin-panel [data-slot="table-head"] {
+  text-align: start;
+}
+
+.admin-panel [data-slot="table-head"].admin-table-actions {
+  text-align: center;
+}
+
+.admin-panel [data-slot="table-cell"] {
+  text-align: start;
+}
+
+.admin-panel [data-slot="table-cell"].admin-table-actions {
+  text-align: center;
+}
+
+/* Form selects — full width like inputs */
+.admin-panel [data-slot="form-control"] [data-slot="select-trigger"] {
+  width: 100%;
+}
+
+.admin-panel .admin-stat-card {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.admin-panel .admin-stat-card:hover {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}

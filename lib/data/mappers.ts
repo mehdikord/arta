@@ -49,7 +49,6 @@ export function mapProduct(p: {
   fullDescription: string;
   image: string;
   fileType: ProductFileType;
-  fileUrl: string;
   price: number | null;
   discountPrice: number | null;
   isFeatured: boolean;
@@ -65,7 +64,6 @@ export function mapProduct(p: {
     category: p.category.name,
     image: p.image,
     fileType: FILE_TYPE_TO_FRONT[p.fileType],
-    fileUrl: p.fileUrl,
     price: p.price,
     discountPrice: p.discountPrice,
     isFeatured: p.isFeatured,

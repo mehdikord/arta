@@ -54,7 +54,7 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        "admin-sidebar flex h-screen shrink-0 flex-col border-s border-[var(--admin-sidebar-border)] transition-[width] duration-200 ease-in-out",
+        "admin-sidebar flex h-full shrink-0 flex-col border-s border-[var(--admin-sidebar-border)] transition-[width] duration-200 ease-in-out",
         collapsed
           ? "w-[var(--admin-sidebar-collapsed-width)]"
           : "w-[var(--admin-sidebar-width)]",

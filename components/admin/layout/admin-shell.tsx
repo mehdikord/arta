@@ -27,8 +27,8 @@ function AdminShellInner({
   const { sidebarCollapsed, mobileOpen, setMobileOpen } = useAdminShell();
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <div className="hidden h-screen shrink-0 lg:block">
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <div className="hidden h-full shrink-0 lg:block">
         <AdminSidebar collapsed={sidebarCollapsed} contactsBadge={contactsBadge} />
       </div>
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ProductDetail } from "@/components/products/product-detail";
 import { getProducts, getProductBySlug } from "@/lib/data";
 import { SITE_CONFIG } from "@/lib/constants";
+import { sanitizeBlogContent } from "@/lib/blog-content";
 
 interface ProductDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -41,5 +42,11 @@ export default async function ProductDetailPage({
 
   if (!product) notFound();
 
-  return <ProductDetail product={product} chapters={product.chapters} />;
+  return (
+    <ProductDetail
+      product={product}
+      chapters={product.chapters}
+      fullDescriptionHtml={sanitizeBlogContent(product.fullDescription)}
+    />
+  );
 }

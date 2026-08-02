@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { Home, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MainLayout } from "@/components/layout/main-layout";
 import { SectionContainer } from "@/components/shared/section-container";
 
 export default function NotFound() {
   return (
-    <MainLayout>
-      <SectionContainer className="flex min-h-[60vh] flex-col items-center justify-center py-24 text-center">
+    <SectionContainer className="flex min-h-[60vh] flex-col items-center justify-center py-24 text-center">
       <div className="mb-6 text-8xl font-bold text-primary/20">۴۰۴</div>
       <h1 className="text-2xl font-bold">صفحه یافت نشد</h1>
       <p className="mt-3 max-w-md text-muted-foreground">
@@ -27,7 +25,6 @@ export default function NotFound() {
           </Link>
         </Button>
       </div>
-      </SectionContainer>
-    </MainLayout>
+    </SectionContainer>
   );
 }

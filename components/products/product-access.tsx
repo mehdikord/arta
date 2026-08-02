@@ -1,8 +1,14 @@
 "use client";
 
-import { FileText, Play, Layers, Download, ExternalLink } from "lucide-react";
+import {
+  CheckCircle2,
+  Download,
+  HardDriveDownload,
+  PackageOpen,
+  ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import type { Product } from "@/types";
 
 interface ProductAccessProps {
@@ -11,84 +17,69 @@ interface ProductAccessProps {
 
 export function ProductAccess({ product }: ProductAccessProps) {
   return (
-    <Card className="overflow-hidden border-primary/20 bg-gradient-to-bl from-primary/5 to-accent/5">
-      <CardContent className="p-6">
-        <h3 className="mb-4 flex items-center gap-2 font-semibold text-primary">
-          <Download className="size-5" />
-          دسترسی به محتوا
-        </h3>
+    <section
+      id="product-download"
+      className="relative scroll-mt-28 overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-bl from-primary/10 via-card to-accent/10 shadow-sm"
+    >
+      <div className="pointer-events-none absolute -start-16 -top-20 size-52 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 -end-16 size-52 rounded-full bg-accent/10 blur-3xl" />
 
-        <div className="space-y-4">
-          {(product.fileType === "pdf" || product.fileType === "mixed") && (
-            <div className="flex items-center justify-between rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                  <FileText className="size-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">فایل PDF</p>
-                  <p className="text-xs text-muted-foreground">
-                    دانلود و مطالعه آفلاین
-                  </p>
-                </div>
-              </div>
-              <Button asChild size="sm">
-                <a
-                  href={product.fileUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Download className="size-4" />
-                  دانلود
-                </a>
-              </Button>
+      <div className="relative p-6 sm:p-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+              <PackageOpen className="size-7" />
             </div>
-          )}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-bold sm:text-2xl">
+                  دانلود پکیج
+                </h2>
+                <Badge className="gap-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                  <CheckCircle2 className="size-3.5" />
+                  خریداری‌شده
+                </Badge>
+              </div>
+              <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
+                فایل اصلی «{product.title}» آماده دریافت است. این فایل فقط از
+                مسیر امن حساب شما قابل دانلود خواهد بود.
+              </p>
+            </div>
+          </div>
 
-          {(product.fileType === "video" || product.fileType === "mixed") && (
-            <div className="overflow-hidden rounded-xl border bg-card">
-              <div className="relative aspect-video bg-gradient-to-bl from-foreground/80 to-foreground/60">
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-primary-foreground">
-                  <div className="flex size-16 items-center justify-center rounded-full bg-primary-foreground/20 backdrop-blur-sm">
-                    <Play className="size-8 fill-current" />
-                  </div>
-                  <p className="text-sm font-medium">پلیر ویدیو (Mock)</p>
-                  <p className="text-xs opacity-70">
-                    پخش آنلاین — فاز Backend
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Play className="size-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">ویدیوی آموزشی</p>
-                    <p className="text-xs text-muted-foreground">
-                      دسترسی آنلاین
-                    </p>
-                  </div>
-                </div>
-                <Button asChild size="sm" variant="outline">
-                  <a href={product.fileUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="size-4" />
-                    مشاهده
-                  </a>
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {product.fileType === "mixed" && (
-            <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              <Layers className="size-4 shrink-0" />
-              این پکیج شامل فایل PDF و ویدیوی آموزشی است.
-            </div>
-          )}
+          <Button
+            asChild
+            size="lg"
+            className="h-12 shrink-0 rounded-xl px-6 shadow-lg shadow-primary/20"
+          >
+            <a href={`/api/products/${product.id}/download`}>
+              <Download className="size-5" />
+              دانلود فایل پکیج
+            </a>
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="mt-6 grid gap-3 border-t border-primary/10 pt-5 sm:grid-cols-2">
+          <div className="flex items-center gap-3 rounded-xl bg-background/70 p-3 backdrop-blur-sm">
+            <HardDriveDownload className="size-5 shrink-0 text-primary" />
+            <div>
+              <p className="text-sm font-medium">یک فایل کامل و دانلودی</p>
+              <p className="text-xs text-muted-foreground">
+                همان فایل اصلی ثبت‌شده توسط مدیریت
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-background/70 p-3 backdrop-blur-sm">
+            <ShieldCheck className="size-5 shrink-0 text-emerald-600" />
+            <div>
+              <p className="text-sm font-medium">دسترسی اختصاصی و امن</p>
+              <p className="text-xs text-muted-foreground">
+                دانلود فقط برای حساب خریدار فعال است
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

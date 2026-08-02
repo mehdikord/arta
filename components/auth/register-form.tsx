@@ -40,12 +40,12 @@ export function RegisterForm() {
 
   async function onSubmit(data: RegisterInput) {
     setLoading(true);
-    const success = await register(data.name, data.mobile, data.password);
+    const result = await register(data);
     setLoading(false);
 
-    if (!success) {
+    if (!result.success) {
       toast.error("ثبت‌نام ناموفق", {
-        description: "این شماره موبایل قبلاً ثبت شده است.",
+        description: result.error,
       });
       return;
     }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { MediaPickerInput } from "@/components/admin/media/media-picker-input";
 import {
   Form,
   FormControl,
@@ -205,9 +206,14 @@ export function ServiceForm({ service }: { service?: Service }) {
           name="image"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>آدرس تصویر</FormLabel>
+              <FormLabel>تصویر خدمت</FormLabel>
               <FormControl>
-                <Input {...field} value={field.value ?? ""} dir="ltr" />
+                <MediaPickerInput
+                  {...field}
+                  value={field.value ?? ""}
+                  onValueChange={field.onChange}
+                  allowClear
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

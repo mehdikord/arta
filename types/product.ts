@@ -8,8 +8,6 @@ export interface Product {
   category: string;
   image: string;
   fileType: "pdf" | "video" | "mixed";
-  /** Mock download URL */
-  fileUrl: string;
   /** null = free */
   price: number | null;
   discountPrice: number | null;

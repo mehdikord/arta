@@ -83,3 +83,118 @@
     0 4px 6px -1px rgb(0 0 0 / 0.1),
     0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
+
+.admin-panel .rich-text-editor__content {
+  min-height: 22rem;
+  padding: 1rem;
+  color: var(--foreground);
+  outline: none;
+}
+
+.admin-panel .rich-text-editor__content > * + * {
+  margin-top: 0.75rem;
+}
+
+.admin-panel .rich-text-editor__content h2 {
+  margin-top: 1.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.admin-panel .rich-text-editor__content h3 {
+  margin-top: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.admin-panel .rich-text-editor__content h4 {
+  margin-top: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.admin-panel .rich-text-editor__content p {
+  line-height: 2;
+}
+
+.admin-panel .rich-text-editor__content ul,
+.admin-panel .rich-text-editor__content ol {
+  padding-inline-start: 1.5rem;
+}
+
+.admin-panel .rich-text-editor__content ul {
+  list-style: disc;
+}
+
+.admin-panel .rich-text-editor__content ol {
+  list-style: decimal;
+}
+
+.admin-panel .rich-text-editor__content blockquote {
+  border-inline-start: 4px solid var(--admin-accent);
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  color: #475569;
+}
+
+.admin-panel .rich-text-editor__content a {
+  color: var(--admin-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-panel .rich-text-editor__content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border-radius: 0.75rem;
+}
+
+.admin-panel .rich-text-editor__content table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+.admin-panel .rich-text-editor__content th,
+.admin-panel .rich-text-editor__content td {
+  position: relative;
+  min-width: 6rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.625rem;
+  vertical-align: top;
+}
+
+.admin-panel .rich-text-editor__content th {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.admin-panel .rich-text-editor__content .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+  background: rgba(54, 153, 255, 0.12);
+}
+
+.admin-panel .rich-text-editor__content .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: var(--admin-accent);
+  pointer-events: none;
+}
+
+.admin-panel .rich-text-editor__content p.is-editor-empty:first-child::before {
+  float: right;
+  height: 0;
+  color: #94a3b8;
+  content: attr(data-placeholder);
+  pointer-events: none;
+}

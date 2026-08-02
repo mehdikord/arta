@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Copy, FileText, Loader2, Trash2, Upload, Video } from "lucide-react";
+import { Copy, Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";
+import { MediaThumbnail } from "@/components/admin/media/media-thumbnail";
 import {
   deleteMediaFileAction,
   type MediaFile,
@@ -100,24 +100,24 @@ export function MediaPageClient({ files }: { files: MediaFile[] }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={cn(
-          "mb-8 flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-white p-12 transition-colors",
+          "mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-dashed bg-white p-3 transition-colors",
           dragOver
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25",
         )}
       >
         {uploading ? (
-          <Loader2 className="size-10 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         ) : (
-          <Upload className="size-10 text-muted-foreground" />
+          <Upload className="size-6 text-muted-foreground" />
         )}
-        <p className="mt-4 text-sm font-medium">
-          فایل را اینجا رها کنید یا انتخاب کنید
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          تصویر، PDF، ویدئو (حداکثر ۵–۲۰ مگابایت)
-        </p>
-        <label className="mt-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">آپلود رسانه جدید</p>
+          <p className="text-xs text-muted-foreground">
+            فایل را اینجا رها کنید یا انتخاب کنید
+          </p>
+        </div>
+        <label>
           <input
             type="file"
             className="sr-only"
@@ -136,65 +136,53 @@ export function MediaPageClient({ files }: { files: MediaFile[] }) {
           هنوز فایلی آپلود نشده است
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12">
           {files.map((file) => (
             <div
               key={file.url}
-              className="group overflow-hidden rounded-xl border bg-white shadow-sm"
+              className="group relative overflow-hidden rounded-md border bg-white"
             >
-              <div className="relative aspect-square bg-muted/30">
-                {file.type === "image" ? (
-                  <Image
-                    src={file.url}
-                    alt={file.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 50vw, 25vw"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    {file.type === "video" ? (
-                      <Video className="size-12 text-muted-foreground" />
-                    ) : (
-                      <FileText className="size-12 text-muted-foreground" />
-                    )}
-                  </div>
-                )}
+              <div className="aspect-square">
+                <MediaThumbnail
+                  file={file}
+                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 16vw, 10vw"
+                />
               </div>
-              <div className="space-y-2 p-3">
-                <p className="truncate text-sm font-medium" title={file.name}>
+              <div className="border-t px-1.5 py-1">
+                <p
+                  className="truncate text-[10px] font-medium"
+                  title={file.name}
+                  dir="ltr"
+                >
                   {file.name}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[9px] text-muted-foreground">
                   {formatFileSize(file.size)}
                 </p>
-                <p
-                  className="truncate text-xs text-muted-foreground font-mono"
-                  dir="ltr"
-                  title={file.url}
+              </div>
+              <div className="absolute end-1 top-1 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon-xs"
+                  className="shadow"
+                  title="کپی آدرس"
+                  aria-label="کپی آدرس"
+                  onClick={() => copyUrl(file.url)}
                 >
-                  {file.url}
-                </p>
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => copyUrl(file.url)}
-                  >
-                    <Copy className="size-3.5" />
-                    کپی
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeleteUrl(file.url)}
-                  >
-                    <Trash2 className="size-3.5 text-destructive" />
-                  </Button>
-                </div>
+                  <Copy className="size-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-xs"
+                  className="shadow"
+                  title="حذف فایل"
+                  aria-label="حذف فایل"
+                  onClick={() => setDeleteUrl(file.url)}
+                >
+                  <Trash2 className="size-3" />
+                </Button>
               </div>
             </div>
           ))}

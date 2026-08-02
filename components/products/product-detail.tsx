@@ -27,9 +27,14 @@ const fileTypeIcons = {
 interface ProductDetailProps {
   product: Product;
   chapters?: { title: string; sortOrder: number }[];
+  fullDescriptionHtml: string;
 }
 
-export function ProductDetail({ product, chapters = [] }: ProductDetailProps) {
+export function ProductDetail({
+  product,
+  chapters = [],
+  fullDescriptionHtml,
+}: ProductDetailProps) {
   const { user } = useAuth();
   const purchased = isPurchased(user, product.id);
   const syllabus = chapters.map((c) => c.title);
@@ -75,9 +80,10 @@ export function ProductDetail({ product, chapters = [] }: ProductDetailProps) {
                 <BookOpen className="size-5 text-primary" />
                 درباره این پکیج
               </h2>
-              <p className="mt-4 leading-relaxed text-muted-foreground">
-                {product.fullDescription}
-              </p>
+              <article
+                className="prose-rtl mt-4 max-w-none"
+                dangerouslySetInnerHTML={{ __html: fullDescriptionHtml }}
+              />
             </div>
 
             <div>

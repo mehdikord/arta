@@ -9,6 +9,12 @@ import {
   type ActionResult,
 } from "@/lib/admin/action-result";
 import { productSchema } from "@/lib/validations/admin/product";
+import {
+  deleteLegacyPublicProductFile,
+  deleteProductFile,
+  isValidProductStorageKey,
+  productFileExists,
+} from "@/lib/product-files";
 
 export async function getProductsAction() {
   await requireAdmin();
@@ -38,8 +44,21 @@ export async function saveProductAction(
   }
 
   const { chapters, ...data } = parsed.data;
+  if (!(await productFileExists(data.fileUrl))) {
+    return actionError("فایل اصلی پکیج یافت نشد؛ لطفاً دوباره آپلود کنید");
+  }
 
+  let previousSlug: string | undefined;
   if (id) {
+    const currentProduct = await prisma.product.findFirst({
+      where: { id, deletedAt: null },
+      select: { fileUrl: true, slug: true },
+    });
+    if (!currentProduct) {
+      return actionError("پکیج یافت نشد");
+    }
+    previousSlug = currentProduct.slug;
+
     await prisma.$transaction([
       prisma.product.update({ where: { id }, data }),
       prisma.productChapter.deleteMany({ where: { productId: id } }),
@@ -47,6 +66,14 @@ export async function saveProductAction(
         data: chapters.map((c) => ({ ...c, productId: id! })),
       }),
     ]);
+    if (currentProduct.fileUrl !== data.fileUrl) {
+      const deletePreviousFile = isValidProductStorageKey(currentProduct.fileUrl)
+        ? deleteProductFile(currentProduct.fileUrl)
+        : deleteLegacyPublicProductFile(currentProduct.fileUrl);
+      await deletePreviousFile.catch((error) => {
+        console.error("Failed to delete replaced product file", error);
+      });
+    }
   } else {
     const created = await prisma.product.create({
       data: {
@@ -58,6 +85,10 @@ export async function saveProductAction(
   }
 
   revalidatePath("/products");
+  revalidatePath(`/products/${data.slug}`);
+  if (previousSlug && previousSlug !== data.slug) {
+    revalidatePath(`/products/${previousSlug}`);
+  }
   revalidatePath("/admins/products");
   return actionSuccess({ id: id! });
 }

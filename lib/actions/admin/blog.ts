@@ -9,6 +9,7 @@ import {
   type ActionResult,
 } from "@/lib/admin/action-result";
 import { blogPostSchema } from "@/lib/validations/admin/blog";
+import { sanitizeBlogContent } from "@/lib/blog-content";
 
 export async function getBlogPostsAction() {
   await requireAdmin();
@@ -39,6 +40,7 @@ export async function saveBlogPostAction(
 
   const data = {
     ...parsed.data,
+    content: sanitizeBlogContent(parsed.data.content),
     publishedAt: new Date(parsed.data.publishedAt),
   };
 

@@ -73,13 +73,10 @@ export function PurchaseCard({ product }: PurchaseCardProps) {
           <div className="flex flex-wrap items-center gap-2 border-t border-dashed pt-4">
             <Button asChild size="sm" className="shadow-sm">
               <a
-                href={product.fileUrl}
-                download={product.fileType !== "video"}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/api/products/${product.id}/download`}
               >
                 <Download className="size-4" />
-                {product.fileType === "video" ? "مشاهده ویدیو" : "دانلود فایل"}
+                دانلود فایل
               </a>
             </Button>
             <Button asChild size="sm" variant="outline">

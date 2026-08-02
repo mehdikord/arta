@@ -11,5 +11,9 @@ export default function AdminRootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="admin-panel h-screen overflow-hidden" dir="rtl">{children}</div>;
+  return (
+    <div className="admin-panel h-dvh min-h-0 overflow-hidden" dir="rtl">
+      {children}
+    </div>
+  );
 }

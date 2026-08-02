@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { MediaPickerInput } from "@/components/admin/media/media-picker-input";
 import {
   Form,
   FormControl,
@@ -261,7 +262,10 @@ export function PortfolioForm({
               <FormItem>
                 <FormLabel>تصویر اصلی</FormLabel>
                 <FormControl>
-                  <Input {...field} dir="ltr" />
+                  <MediaPickerInput
+                    {...field}
+                    onValueChange={field.onChange}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -292,7 +296,11 @@ export function PortfolioForm({
                 render={({ field: f }) => (
                   <FormItem className="flex-1">
                     <FormControl>
-                      <Input {...f} dir="ltr" placeholder="آدرس تصویر" />
+                      <MediaPickerInput
+                        {...f}
+                        onValueChange={f.onChange}
+                        placeholder="انتخاب تصویر گالری"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

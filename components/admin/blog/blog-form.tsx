@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { RichTextEditor } from "@/components/admin/blog/rich-text-editor";
+import { MediaPickerInput } from "@/components/admin/media/media-picker-input";
 import {
   Form,
   FormControl,
@@ -143,7 +145,11 @@ export function BlogForm({
             <FormItem>
               <FormLabel>محتوا</FormLabel>
               <FormControl>
-                <Textarea {...field} rows={12} />
+                <RichTextEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={form.formState.isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -215,9 +221,12 @@ export function BlogForm({
             name="image"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>آدرس تصویر</FormLabel>
+                <FormLabel>تصویر شاخص</FormLabel>
                 <FormControl>
-                  <Input {...field} dir="ltr" />
+                  <MediaPickerInput
+                    {...field}
+                    onValueChange={field.onChange}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

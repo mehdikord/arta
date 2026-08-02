@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { mapProduct } from "./mappers";
 
+function decodeSlug(slug: string) {
+  try {
+    return decodeURIComponent(slug).normalize("NFC");
+  } catch {
+    return slug.normalize("NFC");
+  }
+}
+
 export async function getProducts() {
   const rows = await prisma.product.findMany({
     where: { isPublished: true, deletedAt: null },
@@ -11,8 +19,9 @@ export async function getProducts() {
 }
 
 export async function getProductBySlug(slug: string) {
+  const decodedSlug = decodeSlug(slug);
   const row = await prisma.product.findFirst({
-    where: { slug, isPublished: true, deletedAt: null },
+    where: { slug: decodedSlug, isPublished: true, deletedAt: null },
     include: {
       category: true,
       chapters: { orderBy: { sortOrder: "asc" } },

@@ -1,4 +1,8 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { TeamMember } from "@/types";
@@ -18,6 +22,11 @@ export function TeamCard({ member }: TeamCardProps) {
     <Card className="group h-full overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
       <CardContent className="p-6 text-center">
         <Avatar className="mx-auto size-20 border-2 border-primary/20">
+          <AvatarImage
+            src={member.image}
+            alt={member.name}
+            className="object-cover"
+          />
           <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
             {initials}
           </AvatarFallback>

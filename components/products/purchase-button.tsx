@@ -108,9 +108,9 @@ export function ProductAccessButton({
 }) {
   return (
     <Button asChild size={size} variant="outline" className={className}>
-      <a href={product.fileUrl} download target="_blank" rel="noopener noreferrer">
+      <a href={`/api/products/${product.id}/download`}>
         <Download className="size-4" />
-        دانلود فایل
+        دانلود پکیج
       </a>
     </Button>
   );

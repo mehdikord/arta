@@ -11,7 +11,7 @@ import {
   createPurchaseAction,
   cancelAppointmentAction,
 } from "@/lib/actions/auth";
-import type { LoginInput } from "@/lib/validations/auth";
+import type { LoginInput, RegisterInput } from "@/lib/validations/auth";
 
 export function useAuth() {
   const { user, isAuthenticated } = useUserSession();
@@ -24,11 +24,11 @@ export function useAuth() {
     return true;
   }
 
-  async function register(name: string, mobile: string, password: string) {
-    const result = await registerUserAction({ name, mobile, password });
-    if (!result.success) return false;
+  async function register(input: RegisterInput) {
+    const result = await registerUserAction(input);
+    if (!result.success) return result;
     router.refresh();
-    return true;
+    return result;
   }
 
   async function logout() {

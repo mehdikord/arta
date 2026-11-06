@@ -14,7 +14,7 @@ export interface MediaFile {
   createdAt: Date;
 }
 
-const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
+const UPLOADS_DIR = path.join(process.cwd(), "storage", "web");
 
 function getMediaType(mimeOrExt: string): MediaFile["type"] {
   if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(mimeOrExt) || mimeOrExt.startsWith("image/")) {
@@ -56,7 +56,7 @@ async function scanDir(dir: string, baseUrl: string): Promise<MediaFile[]> {
 
 export async function getMediaFilesAction(): Promise<MediaFile[]> {
   await requireAdmin();
-  const files = await scanDir(UPLOADS_DIR, "/uploads");
+  const files = await scanDir(UPLOADS_DIR, "/api/media");
   return files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 

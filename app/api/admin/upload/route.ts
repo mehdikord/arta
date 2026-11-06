@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   const now = new Date();
   const year = now.getFullYear().toString();
   const month = String(now.getMonth() + 1).padStart(2, "0");
-  const dir = path.join(process.cwd(), "public", "uploads", year, month);
+  const dir = path.join(process.cwd(), "storage", "web", year, month);
   await mkdir(dir, { recursive: true });
 
   const baseName = sanitizeFilename(file.name.replace(/\.[^.]+$/, ""));
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, buffer);
 
-  const url = `/uploads/${year}/${month}/${filename}`;
+  const url = `/api/media/${year}/${month}/${filename}`;
   revalidatePath("/admins/media");
   return NextResponse.json({ url });
 }

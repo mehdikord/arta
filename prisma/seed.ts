@@ -298,7 +298,56 @@ async function main() {
     });
   }
 
+  // Ensure seeded products have their content files registered in
+  // product_files (legacy public file shared by both packages).
+  await ensureProductFile("stress-management-guide", {
+    displayName: "راهنمای جامع مدیریت استرس (PDF)",
+    storageKey: "/files/sample.pdf",
+    kind: "TEXT",
+  });
+  await ensureProductFile("communication-skills", {
+    displayName: "مهارت‌های ارتباط مؤثر (PDF)",
+    storageKey: "/files/sample.pdf",
+    kind: "TEXT",
+  });
+
   console.log("✅ Seed completed.");
+}
+
+/**
+ * Create a product_files row for a seeded product when it does not exist
+ * yet (identified by storage key). Idempotent across re-seeds.
+ */
+async function ensureProductFile(
+  productSlug: string,
+  data: {
+    displayName: string;
+    storageKey: string;
+    kind: "TEXT" | "VIDEO" | "AUDIO" | "ARCHIVE";
+  },
+) {
+  const product = await prisma.product.findUnique({ where: { slug: productSlug } });
+  if (!product) return;
+
+  const existing = await prisma.productFile.count({
+    where: { productId: product.id, storageKey: data.storageKey },
+  });
+  if (existing > 0) return;
+
+  const maxOrder = await prisma.productFile.aggregate({
+    where: { productId: product.id },
+    _max: { sortOrder: true },
+  });
+
+  await prisma.productFile.create({
+    data: {
+      productId: product.id,
+      displayName: data.displayName,
+      storageKey: data.storageKey,
+      kind: data.kind,
+      sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+    },
+  });
 }
 
 main()

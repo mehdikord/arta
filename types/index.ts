@@ -5,7 +5,7 @@ export type { Service, ServiceCategory } from "./service";
 /** Portfolio showcase item */
 export type { PortfolioItem } from "./portfolio";
 /** Educational product/package */
-export type { Product } from "./product";
+export type { Product, ProductFileKind, ProductFileSummary } from "./product";
 /** Blog article */
 export type { BlogPost } from "./blog";
 /** Appointment booking */

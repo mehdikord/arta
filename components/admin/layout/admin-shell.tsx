@@ -49,7 +49,7 @@ function AdminShellInner({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar newContactsCount={contactsBadge} />
-        <main className="admin-content min-h-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="admin-content min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

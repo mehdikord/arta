@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, FileText, Play, Layers, BookOpen } from "lucide-react";
+import {
+  ArrowRight,
+  FileText,
+  Layers,
+  BookOpen,
+  Lock,
+  Music,
+  Play,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -15,13 +23,20 @@ import { ProductContentList } from "./product-content-list";
 import { PurchaseButton, ProductAccessButton } from "./purchase-button";
 import { ProductAccess } from "./product-access";
 import { useAuth } from "@/hooks/use-auth";
-import { isPurchased, FILE_TYPE_LABELS } from "@/lib/product";
-import type { Product } from "@/types";
+import { isPurchased, FILE_TYPE_LABELS, PRODUCT_FILE_KIND_LABELS } from "@/lib/product";
+import type { Product, ProductFileKind } from "@/types";
 
 const fileTypeIcons = {
   pdf: FileText,
   video: Play,
   mixed: Layers,
+};
+
+const productFileKindIcons: Record<ProductFileKind, typeof FileText> = {
+  text: FileText,
+  video: Play,
+  audio: Music,
+  archive: Layers,
 };
 
 interface ProductDetailProps {
@@ -91,6 +106,52 @@ export function ProductDetail({
               <ProductContentList chapters={syllabus} />
             </div>
 
+            <div>
+              <h2 className="mb-4 text-xl font-semibold">فایل‌های پکیج</h2>
+              {product.files && product.files.length > 0 ? (
+                <div className="space-y-2">
+                  {product.files.map((file) => {
+                    const KindIcon = productFileKindIcons[file.kind];
+                    return (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <KindIcon className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {file.displayName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {PRODUCT_FILE_KIND_LABELS[file.kind]}
+                            </p>
+                          </div>
+                        </div>
+                        {!purchased && (
+                          <Lock className="size-4 shrink-0 text-muted-foreground" />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!purchased && (
+                    <p className="flex items-center gap-1.5 text-xs leading-5 text-muted-foreground">
+                      <Lock className="size-3.5 shrink-0" />
+                      دانلود فایل‌ها پس از خرید (یا دریافت رایگان) در بخش «دانلود
+                      فایل‌های پکیج» در دسترس است؛ لینک هر فایل فقط برای
+                      خریدار و به‌صورت زمان‌محدود ساخته می‌شود.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  هنوز فایلی برای این پکیج ثبت نشده است.
+                </p>
+              )}
+            </div>
+
             {purchased && <ProductAccess product={product} />}
           </div>
 
@@ -122,6 +183,12 @@ export function ProductDetail({
                   <dt className="text-muted-foreground">تعداد فصل</dt>
                   <dd className="font-medium">{syllabus.length} فصل</dd>
                 </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">تعداد فایل</dt>
+                  <dd className="font-medium">
+                    {(product.files?.length ?? 0).toLocaleString("fa-IR")} فایل
+                  </dd>
+                </div>
               </dl>
 
               <div className="mt-6 space-y-3">
@@ -130,7 +197,7 @@ export function ProductDetail({
                     <Badge className="w-full justify-center py-1.5 bg-primary/10 text-primary">
                       ✓ در کتابخانه شما
                     </Badge>
-                    <ProductAccessButton product={product} size="lg" className="w-full" />
+                    <ProductAccessButton size="lg" className="w-full" />
                   </>
                 ) : (
                   <PurchaseButton product={product} className="w-full" />

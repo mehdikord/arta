@@ -4,13 +4,25 @@ import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  getStoredOriginalFilename,
-  resolveProductFilePath,
+  getOriginalFilename,
+  getProductFileContentType,
+  resolveProductFileLocation,
 } from "@/lib/product-files";
-import { getUserSessionFromCookie } from "@/lib/user/session";
+import { verifyProductFileDownloadToken } from "@/lib/product-file-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Time-limited, user-bound download for a single product file.
+ *
+ * The only accepted path to these (private) files: a signed token
+ * (from `getProductFileDownloadLinkAction`) that is bound to the exact
+ * user + product + file and expires after the configured TTL
+ * (default 4 hours). There is no direct/public download link.
+ * On every request the purchase is re-checked so deactivated users or
+ * refunded purchases lose access even inside the TTL window.
+ */
 
 function contentDisposition(filename: string): string {
   const asciiFallback = filename
@@ -42,45 +54,54 @@ function parseRange(rangeHeader: string, fileSize: number) {
   return { start, end };
 }
 
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ error: message }, { status });
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string; fileId: string }> },
 ) {
-  const session = await getUserSessionFromCookie();
-  if (!session) {
-    return NextResponse.json({ error: "ابتدا وارد حساب خود شوید" }, { status: 401 });
+  const { id, fileId } = await params;
+
+  const token = request.nextUrl.searchParams.get("token");
+  if (!token) {
+    return jsonError("لینک دانلود معتبر نیست؛ از بخش پکیج‌های من دانلود کنید", 401);
   }
 
-  const { id } = await params;
-  const product = await prisma.product.findFirst({
-    where: {
-      id,
-      purchases: {
-        some: {
-          userId: session.userId,
-          status: "COMPLETED",
-          user: {
-            deletedAt: null,
-          },
-        },
-      },
-    },
-    select: {
-      fileUrl: true,
-    },
-  });
-  if (!product) {
-    return NextResponse.json(
-      { error: "شما به فایل این پکیج دسترسی ندارید" },
-      { status: 403 },
-    );
+  const payload = await verifyProductFileDownloadToken(token);
+  if (!payload) {
+    return jsonError("لینک دانلود منقضی شده است؛ دوباره از حساب خود لینک بگیرید", 410);
+  }
+
+  // The token must point at exactly this route's product + file.
+  if (payload.productId !== id || payload.fileId !== fileId) {
+    return jsonError("لینک دانلود نامعتبر است", 400);
+  }
+
+  // Re-check access on every request.
+  const [user, product, file, purchase] = await Promise.all([
+    prisma.user.findFirst({
+      where: { id: payload.userId, deletedAt: null },
+    }),
+    prisma.product.findFirst({
+      where: { id, deletedAt: null, isPublished: true },
+    }),
+    prisma.productFile.findFirst({ where: { id: fileId, productId: id } }),
+    prisma.purchase.findFirst({
+      where: { userId: payload.userId, productId: id, status: "COMPLETED" },
+    }),
+  ]);
+
+  if (!user || !product || !file || !purchase) {
+    return jsonError("شما به فایل این پکیج دسترسی ندارید", 403);
   }
 
   let filePath: string;
   try {
-    filePath = resolveProductFilePath(product.fileUrl);
+    filePath = resolveProductFileLocation(file.storageKey);
   } catch {
-    return NextResponse.json({ error: "فایل پکیج نامعتبر است" }, { status: 404 });
+    return jsonError("فایل پکیج نامعتبر است", 404);
   }
 
   let fileStats;
@@ -88,15 +109,15 @@ export async function GET(
     fileStats = await stat(filePath);
     if (!fileStats.isFile()) throw new Error("NOT_A_FILE");
   } catch {
-    return NextResponse.json({ error: "فایل پکیج یافت نشد" }, { status: 404 });
+    return jsonError("فایل پکیج یافت نشد", 404);
   }
 
-  const filename = getStoredOriginalFilename(product.fileUrl);
+  const filename = getOriginalFilename(file.storageKey);
   const baseHeaders = {
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-store, max-age=0",
     "Content-Disposition": contentDisposition(filename),
-    "Content-Type": "application/octet-stream",
+    "Content-Type": getProductFileContentType(file.storageKey),
     "X-Content-Type-Options": "nosniff",
   };
   const rangeHeader = request.headers.get("range");

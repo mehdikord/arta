@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { mapProduct } from "./mappers";
 
+const PRODUCT_FILE_SELECT = {
+  id: true,
+  displayName: true,
+  kind: true,
+  sortOrder: true,
+} as const;
+
 function decodeSlug(slug: string) {
   try {
     return decodeURIComponent(slug).normalize("NFC");
@@ -12,7 +19,10 @@ function decodeSlug(slug: string) {
 export async function getProducts() {
   const rows = await prisma.product.findMany({
     where: { isPublished: true, deletedAt: null },
-    include: { category: true },
+    include: {
+      category: true,
+      files: { orderBy: { sortOrder: "asc" }, select: PRODUCT_FILE_SELECT },
+    },
     orderBy: { createdAt: "desc" },
   });
   return rows.map(mapProduct);
@@ -25,6 +35,7 @@ export async function getProductBySlug(slug: string) {
     include: {
       category: true,
       chapters: { orderBy: { sortOrder: "asc" } },
+      files: { orderBy: { sortOrder: "asc" }, select: PRODUCT_FILE_SELECT },
     },
   });
   if (!row) return null;

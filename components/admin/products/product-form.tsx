@@ -6,13 +6,17 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { toast } from "sonner";
 import {
+  Archive,
   CheckCircle2,
-  FileArchive,
+  FileText,
   Loader2,
+  Music,
+  Play,
   Plus,
   ShieldCheck,
   Trash2,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +40,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveProductAction } from "@/lib/actions/admin/products";
-import { PRODUCT_FILE_TYPE_LABELS } from "@/lib/admin/format";
+import {
+  PRODUCT_FILE_KIND_LABELS,
+} from "@/lib/admin/format";
 import { slugify } from "@/lib/admin/slug";
 import {
   productSchema,
@@ -46,41 +52,79 @@ import type {
   Product,
   ProductCategory,
   ProductChapter,
+  ProductFile,
 } from "@/lib/generated/prisma/client";
 
 type ProductWithRelations = Product & {
   category: ProductCategory;
   chapters: ProductChapter[];
+  files: ProductFile[];
 };
 
 type UploadResponse = {
   storageKey?: string;
   filename?: string;
+  size?: number;
+  kind?: "TEXT" | "VIDEO" | "AUDIO";
   error?: string;
 };
 
+type RowUploadState = {
+  uploading: boolean;
+  progress: number;
+  /** True when the visible stored-file box refers to a fresh upload. */
+  justUploaded: boolean;
+};
+
 const ACCEPTED_PRODUCT_FILES =
-  ".pdf,.mp4,.webm,.zip,.rar,.7z,application/pdf,video/mp4,video/webm,application/zip,application/x-7z-compressed";
+  ".pdf,.docx,.txt,.mp4,.webm,.mp3,.m4a,.ogg,.wav,.png,.jpg,.jpeg,.webp,.gif,.zip,.rar,.7z,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,video/mp4,video/webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,image/png,image/jpeg,image/webp,image/gif,application/zip,application/x-zip-compressed,application/vnd.rar,application/x-rar-compressed,application/x-7z-compressed";
 const PRIVATE_FILE_KEY_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,120}$/;
 const FILE_CONTENT_TYPES: Record<string, string> = {
   pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  txt: "text/plain",
   mp4: "video/mp4",
   webm: "video/webm",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  ogg: "audio/ogg",
+  wav: "audio/wav",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
   zip: "application/zip",
   rar: "application/vnd.rar",
   "7z": "application/x-7z-compressed",
 };
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} کیلوبایت`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} مگابایت`;
-}
+const KIND_ICONS = {
+  TEXT: FileText,
+  VIDEO: Play,
+  AUDIO: Music,
+  ARCHIVE: Archive,
+} as const;
 
 function getFileContentType(file: File): string {
   if (file.type) return file.type;
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   return FILE_CONTENT_TYPES[extension] ?? "application/octet-stream";
+}
+
+/** Original file name as shown in the admin UI (client-side helper). */
+function originalNameOf(storageKey: string): string {
+  if (PRIVATE_FILE_KEY_PATTERN.test(storageKey)) {
+    return storageKey.slice(37);
+  }
+  if (
+    storageKey.startsWith("/files/") ||
+    storageKey.startsWith("/uploads/")
+  ) {
+    return storageKey.split("/").pop() ?? storageKey;
+  }
+  return storageKey;
 }
 
 export function ProductForm({
@@ -91,15 +135,8 @@ export function ProductForm({
   categories: ProductCategory[];
 }) {
   const router = useRouter();
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState<{
-    name: string;
-    size?: number;
-  } | null>(
-    product && PRIVATE_FILE_KEY_PATTERN.test(product.fileUrl)
-      ? { name: "فایل امن فعلی پکیج" }
-      : null,
+  const [rowUploads, setRowUploads] = useState<Record<number, RowUploadState>>(
+    {},
   );
 
   const form = useForm<ProductInput>({
@@ -113,7 +150,6 @@ export function ProductForm({
           categoryId: product.categoryId,
           image: product.image,
           fileType: product.fileType,
-          fileUrl: product.fileUrl,
           price: product.price,
           discountPrice: product.discountPrice,
           isFeatured: product.isFeatured,
@@ -121,6 +157,12 @@ export function ProductForm({
           chapters: product.chapters.map((chapter) => ({
             title: chapter.title,
             sortOrder: chapter.sortOrder,
+          })),
+          files: product.files.map((f) => ({
+            displayName: f.displayName,
+            storageKey: f.storageKey,
+            kind: f.kind,
+            sortOrder: f.sortOrder,
           })),
         }
       : {
@@ -131,23 +173,48 @@ export function ProductForm({
           categoryId: categories[0]?.id ?? "",
           image: "",
           fileType: "PDF",
-          fileUrl: "",
           price: null,
           discountPrice: null,
           isFeatured: false,
           isPublished: true,
           chapters: [{ title: "", sortOrder: 0 }],
+          files: [],
         },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: chapterFields, append: appendChapter, remove: removeChapter } =
+    useFieldArray({
+      control: form.control,
+      name: "chapters",
+    });
+
+  const {
+    fields: fileFields,
+    append: appendFile,
+    remove: removeFile,
+  } = useFieldArray({
     control: form.control,
-    name: "chapters",
+    name: "files",
   });
 
-  function uploadProductFile(file: File) {
-    setUploading(true);
-    setUploadProgress(0);
+  const files = form.getValues("files") as ProductInput["files"];
+
+  function setRowUpload(index: number, patch: Partial<RowUploadState>) {
+    setRowUploads((prev) => {
+      const defaults: RowUploadState = {
+        uploading: false,
+        progress: 0,
+        justUploaded: false,
+      };
+      return {
+        ...prev,
+        [index]: { ...defaults, ...prev[index], ...patch },
+      };
+    });
+  }
+
+  function uploadFileForRow(rowIndex: number, file: File) {
+    setRowUpload(rowIndex, { uploading: true, progress: 0 });
 
     const request = new XMLHttpRequest();
     request.open("POST", "/api/admin/products/upload");
@@ -156,7 +223,9 @@ export function ProductForm({
 
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
-        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+        setRowUpload(rowIndex, {
+          progress: Math.round((event.loaded / event.total) * 100),
+        });
       }
     });
 
@@ -171,48 +240,69 @@ export function ProductForm({
       if (
         request.status < 200 ||
         request.status >= 300 ||
-        !response.storageKey
+        !response.storageKey ||
+        !response.kind
       ) {
+        setRowUpload(rowIndex, { uploading: false, progress: 0 });
         toast.error(response.error ?? "آپلود فایل ناموفق بود");
-        setUploading(false);
-        setUploadProgress(0);
         return;
       }
 
-      form.setValue("fileUrl", response.storageKey, {
+      form.setValue(`files.${rowIndex}.storageKey`, response.storageKey, {
         shouldDirty: true,
         shouldValidate: true,
       });
-      setUploadedFile({ name: response.filename ?? file.name, size: file.size });
-      setUploadProgress(100);
-      setUploading(false);
-      toast.success("فایل اصلی با موفقیت و به‌صورت امن آپلود شد");
+      form.setValue(`files.${rowIndex}.kind`, response.kind, {
+        shouldValidate: true,
+      });
+      const currentName = form.getValues(`files.${rowIndex}.displayName`)?.trim();
+      if (!currentName) {
+        form.setValue(
+          `files.${rowIndex}.displayName`,
+          response.filename ?? file.name,
+          { shouldDirty: true },
+        );
+      }
+
+      setRowUpload(rowIndex, {
+        uploading: false,
+        progress: 100,
+        justUploaded: true,
+      });
+      toast.success("فایل با موفقیت و به‌صورت امن آپلود شد");
     });
 
     request.addEventListener("error", () => {
-      setUploading(false);
-      setUploadProgress(0);
+      setRowUpload(rowIndex, { uploading: false, progress: 0 });
       toast.error("ارتباط هنگام آپلود قطع شد؛ دوباره تلاش کنید");
     });
 
     request.addEventListener("abort", () => {
-      setUploading(false);
-      setUploadProgress(0);
+      setRowUpload(rowIndex, { uploading: false, progress: 0 });
       toast.error("آپلود فایل متوقف شد");
     });
 
     request.send(file);
   }
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleRowFileChange(index: number, event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file) uploadProductFile(file);
+    if (file) uploadFileForRow(index, file);
     event.target.value = "";
   }
 
+  function handleRemoveFile(index: number) {
+    removeFile(index);
+    setRowUploads((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+  }
+
   async function onSubmit(values: ProductInput) {
-    if (uploading) {
-      toast.error("تا پایان آپلود فایل منتظر بمانید");
+    if (Object.values(rowUploads).some((s) => s.uploading)) {
+      toast.error("تا پایان آپلود فایل‌ها منتظر بمانید");
       return;
     }
 
@@ -226,7 +316,8 @@ export function ProductForm({
     router.refresh();
   }
 
-  const isBusy = uploading || form.formState.isSubmitting;
+  const anyRowUploading = Object.values(rowUploads).some((s) => s.uploading);
+  const isBusy = anyRowUploading || form.formState.isSubmitting;
 
   return (
     <Form {...form}>
@@ -397,13 +488,13 @@ export function ProductForm({
               variant="outline"
               size="sm"
               disabled={isBusy}
-              onClick={() => append({ title: "", sortOrder: fields.length })}
+              onClick={() => appendChapter({ title: "", sortOrder: chapterFields.length })}
             >
               <Plus className="size-4" />
               افزودن سرفصل
             </Button>
           </div>
-          {fields.map((chapter, index) => (
+          {chapterFields.map((chapter, index) => (
             <div key={chapter.id} className="flex gap-3">
               <FormField
                 control={form.control}
@@ -444,8 +535,8 @@ export function ProductForm({
                 type="button"
                 variant="ghost"
                 size="icon"
-                disabled={fields.length <= 1 || isBusy}
-                onClick={() => remove(index)}
+                disabled={chapterFields.length <= 1 || isBusy}
+                onClick={() => removeChapter(index)}
               >
                 <Trash2 className="size-4 text-destructive" />
               </Button>
@@ -454,131 +545,236 @@ export function ProductForm({
         </section>
 
         <section className="space-y-6 border-t pt-8">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="fileType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>نوع فایل</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isBusy}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {Object.entries(PRODUCT_FILE_TYPE_LABELS).map(
-                        ([key, label]) => (
-                          <SelectItem key={key} value={key}>
-                            {label}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
-              <div className="flex items-center gap-2 font-medium text-primary">
-                <ShieldCheck className="size-5" />
-                نگهداری خصوصی فایل
-              </div>
-              <p className="mt-2 leading-6 text-muted-foreground">
-                فایل خارج از پوشه عمومی ذخیره می‌شود و فقط خریدار احراز هویت‌شده
-                امکان دانلود دارد.
-              </p>
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium text-primary">
+              <ShieldCheck className="size-5" />
+              نگهداری خصوصی فایل‌ها
             </div>
+            <p className="mt-2 leading-6 text-muted-foreground">
+              فایل‌ها خارج از پوشهٔ عمومی ذخیره می‌شوند. لینک مستقیم دانلود
+              وجود ندارد؛ فقط خریدار، با لینک اختصاصی و زمان‌محدود (پیش‌فرض ۴
+              ساعت) می‌تواند هر فایل را دانلود کند.
+            </p>
           </div>
 
-          <FormField
-            control={form.control}
-            name="fileUrl"
-            render={() => (
-              <FormItem>
-                <FormLabel>فایل اصلی پکیج</FormLabel>
-                <FormControl>
-                  <div className="space-y-3">
-                    <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/20 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
-                      <input
-                        type="file"
-                        className="sr-only"
-                        accept={ACCEPTED_PRODUCT_FILES}
-                        disabled={isBusy}
-                        onChange={handleFileChange}
-                      />
-                      {uploading ? (
-                        <Loader2 className="mb-3 size-8 animate-spin text-primary" />
-                      ) : (
-                        <UploadCloud className="mb-3 size-8 text-primary" />
-                      )}
-                      <span className="font-medium">
-                        {uploading
-                          ? "فایل سنگین در حال آپلود است…"
-                          : product
-                            ? "برای جایگزینی فایل کلیک کنید"
-                            : "فایل اصلی پکیج را انتخاب کنید"}
-                      </span>
-                      <span className="mt-1 text-xs text-muted-foreground">
-                        PDF، MP4، WebM، ZIP، RAR یا 7Z
-                      </span>
-                    </label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <FormLabel>فایل‌های پکیج</FormLabel>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isBusy}
+                onClick={() =>
+                  appendFile({
+                    displayName: "",
+                    storageKey: "",
+                    kind: "TEXT",
+                    sortOrder: fileFields.length,
+                  })
+                }
+              >
+                <Plus className="size-4" />
+                افزودن فایل
+              </Button>
+            </div>
 
-                    {uploading && (
-                      <div
-                        className="space-y-2 rounded-lg border bg-white p-4"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        <div className="flex items-center justify-between text-sm">
-                          <span>در حال انتقال فایل؛ صفحه را نبندید</span>
-                          <span className="font-semibold text-primary">
-                            {uploadProgress}٪
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary transition-[width] duration-300"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {uploadedFile && !uploading && (
-                      <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
-                        <CheckCircle2 className="size-5 shrink-0" />
-                        <FileArchive className="size-5 shrink-0" />
-                        <div className="min-w-0 text-sm">
-                          <p className="truncate font-medium">
-                            {uploadedFile.name}
-                          </p>
-                          <p className="text-xs opacity-80">
-                            {uploadedFile.size
-                              ? `${formatFileSize(uploadedFile.size)} — آماده ذخیره`
-                              : "ذخیره‌شده در فضای خصوصی"}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {product && !uploadedFile && !uploading && (
-                      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-                        فایل قبلی از نوع لینک عمومی است. برای ایمن‌سازی این پکیج،
-                        فایل اصلی را دوباره از همین بخش آپلود کنید.
-                      </div>
-                    )}
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+            {files.length === 0 && (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                حداقل یک فایل برای پکیج لازم است. فایل‌های متن (PDF، Word،
+                TXT)، ویدیو (MP4، WebM) و صوتی (MP3، M4A، OGG، WAV) مجازند؛
+                نوع فایل هنگام آپلود به‌صورت خودکار تشخیص داده می‌شود.
+              </p>
             )}
-          />
+
+            {fileFields.map((fileField, index) => {
+              const row = files[index];
+              const state = rowUploads[index];
+              const KindIcon = row?.kind
+                ? KIND_ICONS[row.kind]
+                : FileText;
+              const storedKey = row?.storageKey;
+              const hasStoredFile = Boolean(storedKey);
+
+              return (
+                <div
+                  key={fileField.id}
+                  className="space-y-4 rounded-xl border bg-white p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">فایل {index + 1}</span>
+                      {row?.kind && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                          <KindIcon className="size-3.5" />
+                          {PRODUCT_FILE_KIND_LABELS[row.kind]}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={fileFields.length <= 1 || isBusy}
+                      onClick={() => handleRemoveFile(index)}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                    <FormField
+                      control={form.control}
+                      name={`files.${index}.displayName`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>نام نمایشی</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="عنوانی که در سایت نمایش داده می‌شود"
+                              disabled={isBusy}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`files.${index}.sortOrder`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ترتیب</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              value={field.value}
+                              disabled={isBusy}
+                              onChange={(event) =>
+                                field.onChange(event.target.valueAsNumber || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name={`files.${index}.storageKey`}
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>فایل اصلی</FormLabel>
+                        <FormControl>
+                          <div className="space-y-3">
+                            {hasStoredFile && !state?.uploading && (
+                              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
+                                <CheckCircle2 className="size-5 shrink-0" />
+                                <div className="min-w-0 flex-1 text-sm">
+                                  <p className="truncate font-medium">
+                                    {originalNameOf(storedKey!)}
+                                  </p>
+                                  <p className="text-xs opacity-80">
+                                    {state?.justUploaded
+                                      ? "آمادهٔ ذخیره — پس از ذخیرهٔ پکیج فعال می‌شود"
+                                      : "ذخیره‌شده در فضای خصوصی"}
+                                  </p>
+                                </div>
+                                <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100">
+                                  <UploadCloud className="size-3.5" />
+                                  جایگزینی فایل
+                                  <input
+                                    type="file"
+                                    className="sr-only"
+                                    accept={ACCEPTED_PRODUCT_FILES}
+                                    disabled={isBusy}
+                                    onChange={(event) =>
+                                      handleRowFileChange(index, event)
+                                    }
+                                  />
+                                </label>
+                              </div>
+                            )}
+
+                            {(state?.uploading || !hasStoredFile) && (
+                              <div>
+                                <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/20 px-4 py-4 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+                                  <input
+                                    type="file"
+                                    className="sr-only"
+                                    accept={ACCEPTED_PRODUCT_FILES}
+                                    disabled={isBusy}
+                                    onChange={(event) =>
+                                      handleRowFileChange(index, event)
+                                    }
+                                  />
+                                  {state?.uploading ? (
+                                    <Loader2
+                                      className="mb-2 size-7 animate-spin text-primary"
+                                    />
+                                  ) : (
+                                    <UploadCloud className="mb-2 size-7 text-primary" />
+                                  )}
+                                  <span className="text-sm font-medium">
+                                    {state?.uploading
+                                      ? "فایل در حال آپلود است…"
+                                      : hasStoredFile
+                                        ? "فایل جدید را انتخاب کنید"
+                                        : "انتخاب فایل (PDF، ویدیو، صوتی)"}
+                                  </span>
+                                  <span className="mt-1 text-xs text-muted-foreground">
+                                    PDF، Word، TXT، MP4، WebM، MP3، M4A، OGG یا WAV
+                                  </span>
+                                </label>
+
+                                {state?.uploading && (
+                                  <div
+                                    className="mt-3 space-y-2 rounded-lg border bg-white p-3"
+                                    role="status"
+                                    aria-live="polite"
+                                  >
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span>در حال انتقال فایل؛ صفحه را نبندید</span>
+                                      <span className="font-semibold text-primary">
+                                        {state.progress}٪
+                                      </span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                      <div
+                                        className="h-full rounded-full bg-primary transition-[width] duration-300"
+                                        style={{ width: `${state.progress}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {hasStoredFile && state?.uploading && (
+                              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <X className="size-3" />
+                                فایل فعلی با فایل جدید جایگزین می‌شود
+                              </p>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              );
+            })}
+
+            <p className="text-xs leading-6 text-muted-foreground">
+              نوع هر فایل هنگام آپلود به‌طور خودکار شناسایی می‌شود و قابل
+              ویرایش دستی نیست. فایل‌های آرشیوی قدیمی (ZIP/RAR/7Z) فقط در
+              حالت جایگزینی نمایش داده می‌شوند و قابل آپلود جدید نیستند.
+            </p>
+          </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
             <FormField
@@ -636,8 +832,8 @@ export function ProductForm({
         <div className="flex gap-3 border-t pt-6">
           <Button type="submit" disabled={isBusy}>
             {isBusy && <Loader2 className="size-4 animate-spin" />}
-            {uploading
-              ? `در حال آپلود ${uploadProgress}٪`
+            {anyRowUploading
+              ? "در حال آپلود فایل‌ها…"
               : form.formState.isSubmitting
                 ? "در حال ذخیره…"
                 : "ذخیره پکیج"}

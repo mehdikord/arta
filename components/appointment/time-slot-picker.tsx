@@ -20,23 +20,18 @@ export function TimeSlotPicker({
   onSelect,
 }: TimeSlotPickerProps) {
   const [bookedSlots, setBookedSlots] = useState<TimeSlot[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!date) {
-      setBookedSlots([]);
-      return;
-    }
-
+    if (!date) return;
     let cancelled = false;
-    setLoading(true);
 
     getBookedSlotsForDateAction(date)
       .then((slots) => {
         if (!cancelled) setBookedSlots(slots);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedDate(date);
       });
 
     return () => {
@@ -53,6 +48,7 @@ export function TimeSlotPicker({
   }
 
   const pastSlots = isToday(date) ? getPastSlotsForToday() : [];
+  const loading = loadedDate !== date;
 
   const slots = TIME_SLOTS.map((slot) => {
     let status: SlotStatus = "available";

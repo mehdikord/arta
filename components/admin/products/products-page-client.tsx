@@ -18,7 +18,7 @@ import type { Product, ProductCategory } from "@/lib/generated/prisma/client";
 
 type ProductRow = Product & {
   category: ProductCategory;
-  _count: { chapters: number };
+  _count: { chapters: number; files: number };
 };
 
 export function ProductsPageClient({ products }: { products: ProductRow[] }) {
@@ -64,6 +64,11 @@ export function ProductsPageClient({ products }: { products: ProductRow[] }) {
       id: "chapters",
       header: "سرفصل‌ها",
       cell: ({ row }) => row.original._count.chapters,
+    },
+    {
+      id: "files",
+      header: "فایل‌ها",
+      cell: ({ row }) => row.original._count.files,
     },
   ];
 

@@ -1,24 +1,25 @@
 import Link from "next/link";
-import { ArrowLeft, Download, ExternalLink, FileText, Play, Package, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, Package, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/shared/category-badge";
 import { ProductImage } from "@/components/products/product-image";
+import { ProductFileDownloadList } from "@/components/products/product-file-download-list";
 import { isFree } from "@/lib/product";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
 
 function FileTypeChip({ type }: { type: Product["fileType"] }) {
   const config = {
-    pdf: { icon: FileText, label: "فایل PDF", color: "bg-destructive/10 text-destructive" },
-    video: { icon: Play, label: "ویدیوی آموزشی", color: "bg-primary/10 text-primary" },
-    mixed: { icon: Sparkles, label: "PDF + ویدیو", color: "bg-accent/15 text-accent" },
+    pdf: { label: "فایل PDF", color: "bg-destructive/10 text-destructive" },
+    video: { label: "ویدیوی آموزشی", color: "bg-primary/10 text-primary" },
+    mixed: { label: "PDF + ویدیو", color: "bg-accent/15 text-accent" },
   } as const;
 
-  const { icon: Icon, label, color } = config[type];
+  const { label, color } = config[type];
 
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium", color)}>
-      <Icon className="size-3.5" />
+      <Sparkles className="size-3.5" />
       {label}
     </span>
   );
@@ -68,18 +69,14 @@ export function PurchaseCard({ product }: PurchaseCardProps) {
                 {product.shortDescription}
               </p>
             </div>
+
+            {(product.files?.length ?? 0) > 0 && (
+              <ProductFileDownloadList product={product} compact />
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-dashed pt-4">
-            <Button asChild size="sm" className="shadow-sm">
-              <a
-                href={`/api/products/${product.id}/download`}
-              >
-                <Download className="size-4" />
-                دانلود فایل
-              </a>
-            </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline" className="shadow-sm">
               <Link href={`/products/${product.slug}`}>
                 <ExternalLink className="size-4" />
                 جزئیات پکیج

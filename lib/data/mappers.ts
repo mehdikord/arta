@@ -1,6 +1,10 @@
-import type { ServiceCategory as PrismaServiceCategory, ProductFileType } from "@/lib/generated/prisma/client";
+import type {
+  ServiceCategory as PrismaServiceCategory,
+  ProductFileType,
+  ProductFileKind as PrismaProductFileKind,
+} from "@/lib/generated/prisma/client";
 import type { Service, ServiceCategory } from "@/types/service";
-import type { Product } from "@/types/product";
+import type { Product, ProductFileSummary } from "@/types/product";
 import type { PortfolioItem } from "@/types/portfolio";
 import type { BlogPost } from "@/types/blog";
 import type { FAQ } from "@/types/faq";
@@ -18,6 +22,27 @@ const FILE_TYPE_TO_FRONT: Record<ProductFileType, Product["fileType"]> = {
   VIDEO: "video",
   MIXED: "mixed",
 };
+
+const PRODUCT_FILE_KIND_TO_FRONT: Record<PrismaProductFileKind, ProductFileSummary["kind"]> = {
+  TEXT: "text",
+  VIDEO: "video",
+  AUDIO: "audio",
+  ARCHIVE: "archive",
+};
+
+export function mapProductFile(f: {
+  id: string;
+  displayName: string;
+  kind: PrismaProductFileKind;
+  sortOrder: number;
+}): ProductFileSummary {
+  return {
+    id: f.id,
+    displayName: f.displayName,
+    kind: PRODUCT_FILE_KIND_TO_FRONT[f.kind],
+    sortOrder: f.sortOrder,
+  };
+}
 
 export function mapService(s: {
   id: string;
@@ -54,6 +79,12 @@ export function mapProduct(p: {
   isFeatured: boolean;
   createdAt: Date;
   category: { name: string };
+  files?: {
+    id: string;
+    displayName: string;
+    kind: PrismaProductFileKind;
+    sortOrder: number;
+  }[];
 }): Product {
   return {
     id: p.id,
@@ -68,6 +99,7 @@ export function mapProduct(p: {
     discountPrice: p.discountPrice,
     isFeatured: p.isFeatured,
     createdAt: p.createdAt.toISOString().slice(0, 10),
+    files: p.files?.map(mapProductFile),
   };
 }
 

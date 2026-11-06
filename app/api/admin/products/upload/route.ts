@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSessionFromCookie } from "@/lib/admin/session";
 import {
   PRODUCT_FILE_TYPES,
+  detectProductFileKind,
   ensureProductFileStorage,
   getProductFileMaxSize,
   resolveProductFilePath,
@@ -34,10 +35,12 @@ export async function POST(request: NextRequest) {
   }
 
   const contentType = request.headers.get("content-type")?.split(";")[0].trim();
-  const expectedExtension = contentType
-    ? PRODUCT_FILE_TYPES[contentType]
+  const contentTypeLower = contentType?.toLowerCase().trim();
+  const expectedExtension = contentTypeLower
+    ? PRODUCT_FILE_TYPES[contentTypeLower]
     : undefined;
-  if (!contentType || !expectedExtension) {
+  const kind = contentTypeLower ? detectProductFileKind(contentTypeLower) : null;
+  if (!contentTypeLower || !expectedExtension || !kind) {
     return NextResponse.json({ error: "نوع فایل مجاز نیست" }, { status: 415 });
   }
 
@@ -100,6 +103,7 @@ export async function POST(request: NextRequest) {
       storageKey,
       filename: safeFilename,
       size: receivedBytes,
+      kind,
     });
   } catch (error) {
     await unlink(destination).catch(() => undefined);

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { isFree, isPurchased } from "@/lib/product";
+import { cn } from "@/lib/utils";
 import { PurchaseDialog } from "./purchase-dialog";
 import { FreeAccessDialog } from "./free-access-dialog";
 import type { Product } from "@/types";
@@ -96,21 +97,27 @@ export function PurchaseButton({
   );
 }
 
-/** Download / access button shown after purchase */
+/** Download / access button shown after purchase (scrolls to the file list). */
 export function ProductAccessButton({
-  product,
   size = "default",
   className,
 }: {
-  product: Product;
   size?: "default" | "sm" | "lg";
   className?: string;
 }) {
   return (
-    <Button asChild size={size} variant="outline" className={className}>
-      <a href={`/api/products/${product.id}/download`}>
+    <Button
+      asChild
+      size={size}
+      variant="secondary"
+      className={cn(
+        "bg-primary text-primary-foreground hover:bg-primary/90",
+        className,
+      )}
+    >
+      <a href="#product-download">
         <Download className="size-4" />
-        دانلود پکیج
+        دانلود فایل‌ها
       </a>
     </Button>
   );

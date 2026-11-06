@@ -3,6 +3,7 @@ import type {
   AppointmentStatus,
   ContactStatus,
   ProductFileType,
+  ProductFileKind,
   PurchaseStatus,
   ServiceCategory,
 } from "@/lib/generated/prisma/client";
@@ -18,6 +19,13 @@ export const PRODUCT_FILE_TYPE_LABELS: Record<ProductFileType, string> = {
   PDF: "PDF",
   VIDEO: "ویدئو",
   MIXED: "ترکیبی",
+};
+
+export const PRODUCT_FILE_KIND_LABELS: Record<ProductFileKind, string> = {
+  TEXT: "متنی",
+  VIDEO: "ویدیو",
+  AUDIO: "صوتی",
+  ARCHIVE: "بسته‌بندی‌شده",
 };
 
 export const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {

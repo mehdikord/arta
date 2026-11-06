@@ -1,4 +1,4 @@
-import type { Product } from "@/types";
+import type { Product, ProductFileKind } from "@/types";
 import type { SessionUser } from "@/types/session-user";
 
 /** Product is free when price is null or 0 */
@@ -107,4 +107,12 @@ export const FILE_TYPE_LABELS: Record<Product["fileType"], string> = {
   pdf: "فایل PDF",
   video: "ویدیوی آموزشی",
   mixed: "ترکیبی (PDF + ویدیو)",
+};
+
+/** Human labels for per-file content kinds (auto-detected on upload). */
+export const PRODUCT_FILE_KIND_LABELS: Record<ProductFileKind, string> = {
+  text: "متنی",
+  video: "ویدیو",
+  audio: "صوتی",
+  archive: "بسته‌بندی‌شده",
 };

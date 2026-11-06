@@ -2,20 +2,22 @@
 
 import {
   CheckCircle2,
-  Download,
-  HardDriveDownload,
+  Files,
   PackageOpen,
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { Product } from "@/types";
+import { ProductFileDownloadList } from "./product-file-download-list";
 
 interface ProductAccessProps {
   product: Product;
 }
 
+/** Download section shown to purchasers on the product detail page. */
 export function ProductAccess({ product }: ProductAccessProps) {
+  const fileCount = product.files?.length ?? 0;
+
   return (
     <section
       id="product-download"
@@ -33,7 +35,7 @@ export function ProductAccess({ product }: ProductAccessProps) {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-bold sm:text-2xl">
-                  دانلود پکیج
+                  دانلود فایل‌های پکیج
                 </h2>
                 <Badge className="gap-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
                   <CheckCircle2 className="size-3.5" />
@@ -41,31 +43,34 @@ export function ProductAccess({ product }: ProductAccessProps) {
                 </Badge>
               </div>
               <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
-                فایل اصلی «{product.title}» آماده دریافت است. این فایل فقط از
-                مسیر امن حساب شما قابل دانلود خواهد بود.
+                فایل‌های «{product.title}» آماده دریافت است. هر فایل با لینک
+                اختصاصی و زمان‌محدود فقط برای حساب شما در دسترس است.
               </p>
             </div>
           </div>
 
-          <Button
-            asChild
-            size="lg"
-            className="h-12 shrink-0 rounded-xl px-6 shadow-lg shadow-primary/20"
-          >
-            <a href={`/api/products/${product.id}/download`}>
-              <Download className="size-5" />
-              دانلود فایل پکیج
-            </a>
-          </Button>
+          <div className="flex shrink-0 items-center gap-2 rounded-xl bg-primary/10 px-4 py-3 text-primary">
+            <Files className="size-5" />
+            <div>
+              <p className="text-sm font-medium">
+                {fileCount.toLocaleString("fa-IR")} فایل
+              </p>
+              <p className="text-xs opacity-80">قابل دانلود اختصاصی</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <ProductFileDownloadList product={product} showNote />
         </div>
 
         <div className="mt-6 grid gap-3 border-t border-primary/10 pt-5 sm:grid-cols-2">
           <div className="flex items-center gap-3 rounded-xl bg-background/70 p-3 backdrop-blur-sm">
-            <HardDriveDownload className="size-5 shrink-0 text-primary" />
+            <Files className="size-5 shrink-0 text-primary" />
             <div>
-              <p className="text-sm font-medium">یک فایل کامل و دانلودی</p>
+              <p className="text-sm font-medium">محتوای کامل پکیج</p>
               <p className="text-xs text-muted-foreground">
-                همان فایل اصلی ثبت‌شده توسط مدیریت
+                همه فایل‌های ثبت‌شده توسط مدیریت، در همین‌جا
               </p>
             </div>
           </div>
@@ -74,7 +79,7 @@ export function ProductAccess({ product }: ProductAccessProps) {
             <div>
               <p className="text-sm font-medium">دسترسی اختصاصی و امن</p>
               <p className="text-xs text-muted-foreground">
-                دانلود فقط برای حساب خریدار فعال است
+                لینک دانلود فقط برای حساب خریدار ساخته می‌شود
               </p>
             </div>
           </div>

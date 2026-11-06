@@ -85,7 +85,7 @@
 }
 
 .admin-panel .rich-text-editor__content {
-  min-height: 22rem;
+  min-height: 16rem;
   padding: 1rem;
   color: var(--foreground);
   outline: none;

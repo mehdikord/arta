@@ -175,6 +175,7 @@ model Product {
 
   category  ProductCategory  @relation(fields: [categoryId], references: [id])
   chapters  ProductChapter[]
+  files     ProductFile[]
   purchases Purchase[]
 
   @@index([categoryId])
@@ -182,6 +183,38 @@ model Product {
   @@index([isPublished])
   @@index([deletedAt])
   @@map("products")
+}
+
+/// Downloadable content file attached to a product (course).
+///
+/// A product can carry multiple files; the kind is auto-detected from the
+/// uploaded MIME type at upload time. `ARCHIVE` exists only for legacy files
+/// (zip/rar/7z) that predate the multi-file feature and is not produced by
+/// the current upload route.
+model ProductFile {
+  id          String          @id @default(uuid())
+  productId   String          @map("product_id")
+  /// Title shown on the site / user panel.
+  displayName String          @map("display_name") @db.VarChar(191)
+  /// Private storage key (uuid-name) or legacy public URL (/files/..., /uploads/...).
+  storageKey  String          @map("storage_key") @db.VarChar(500)
+  kind        ProductFileKind @map("kind")
+  sortOrder   Int             @default(0) @map("sort_order")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_files")
+}
+
+/// Per-file content type, auto-detected from the uploaded MIME type.
+enum ProductFileKind {
+  TEXT
+  VIDEO
+  AUDIO
+  /// Legacy archives (zip/rar/7z); not uploadable anymore.
+  ARCHIVE
 }
 
 /// Ordered syllabus chapter belonging to a product.

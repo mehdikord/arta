@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { getAdminSessionFromCookie } from "@/lib/admin/session";
+import { revalidatePath } from "next/cache";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_DOC_SIZE = 20 * 1024 * 1024;
@@ -55,5 +56,6 @@ export async function POST(request: NextRequest) {
   await writeFile(filePath, buffer);
 
   const url = `/uploads/${year}/${month}/${filename}`;
+  revalidatePath("/admins/media");
   return NextResponse.json({ url });
 }

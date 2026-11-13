@@ -1,10 +1,10 @@
-import { MediaPageClient } from "@/components/admin/media/media-page-client";
-import { getMediaFilesAction } from "@/lib/actions/admin/media";
+import { MediaLibrary } from "@/components/admin/media/media-library";
+import { getMediaLibraryAction } from "@/lib/actions/admin/media";
 
-export const metadata = { title: "رسانه" };
+export const metadata = { title: "کتابخانهٔ رسانه" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminMediaPage() {
-  const files = await getMediaFilesAction();
-  return <MediaPageClient files={files} />;
+  const { files, usage } = await getMediaLibraryAction();
+  return <MediaLibrary files={files} usage={usage} />;
 }

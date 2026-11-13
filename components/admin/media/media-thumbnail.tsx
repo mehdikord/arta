@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { FileQuestion, FileText, Video } from "lucide-react";
+import { FileQuestion, FileText, Music, Video } from "lucide-react";
 import type { MediaFile } from "@/lib/actions/admin/media";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,8 @@ export function MediaThumbnail({
         />
       ) : file.type === "video" ? (
         <Video className="size-7 text-muted-foreground" />
+      ) : file.type === "audio" ? (
+        <Music className="size-7 text-muted-foreground" />
       ) : file.type === "document" ? (
         <FileText className="size-7 text-muted-foreground" />
       ) : (

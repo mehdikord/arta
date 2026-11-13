@@ -27,7 +27,7 @@ function AdminShellInner({
   const { sidebarCollapsed, mobileOpen, setMobileOpen } = useAdminShell();
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden">
+    <div className="relative flex h-full min-h-0 overflow-hidden">
       <div className="hidden h-full shrink-0 lg:block">
         <AdminSidebar collapsed={sidebarCollapsed} contactsBadge={contactsBadge} />
       </div>
@@ -49,7 +49,7 @@ function AdminShellInner({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar newContactsCount={contactsBadge} />
-        <main className="admin-content min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="admin-content relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

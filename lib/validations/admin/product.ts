@@ -13,6 +13,8 @@ export const productChapterSchema = z.object({
 });
 
 export const productFileSchema = z.object({
+  /** Client-only stable row id (ignored by the server). */
+  clientId: z.string().max(64).optional(),
   displayName: z.string().min(1, "نام نمایشی فایل الزامی است").max(191),
   storageKey: z
     .string()

@@ -38,7 +38,7 @@ export function TestimonialsPageClient({
     {
       accessorKey: "rating",
       header: "امتیاز",
-      cell: ({ row }) => `${row.original.rating}/۵`,
+      cell: ({ row }) => `${row.original.rating.toLocaleString("fa-IR")}/۵`,
     },
     {
       accessorKey: "sortOrder",

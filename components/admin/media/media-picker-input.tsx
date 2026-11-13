@@ -40,7 +40,7 @@ export const MediaPickerInput = React.forwardRef<
     allowClear = false,
     disabled,
     className,
-    placeholder = "برای انتخاب تصویر از رسانه کلیک کنید",
+    placeholder = "انتخاب تصویر از رسانه‌ها",
     ...inputProps
   },
   ref,
@@ -93,16 +93,17 @@ export const MediaPickerInput = React.forwardRef<
 
   return (
     <>
-      <div className="flex gap-2" dir="ltr">
+      <div className="flex gap-2">
         <Input
           {...inputProps}
           ref={ref}
           value={normalizedValue}
           readOnly
+          dir="ltr"
           disabled={disabled}
           placeholder={placeholder}
           title={normalizedValue || undefined}
-          className={cn("cursor-pointer text-left", className)}
+          className={cn("cursor-pointer", className)}
           onClick={() => !disabled && handleOpenChange(true)}
         />
         {allowClear && normalizedValue ? (
@@ -123,7 +124,7 @@ export const MediaPickerInput = React.forwardRef<
           variant="outline"
           disabled={disabled}
           onClick={() => handleOpenChange(true)}
-          dir="rtl"
+          className="shrink-0"
         >
           <Images className="size-4" />
           انتخاب

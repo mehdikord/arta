@@ -1,22 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { toast } from "sonner";
 import {
-  Archive,
+  AlertCircle,
   CheckCircle2,
-  FileText,
+  Eye,
+  ImageIcon,
   Loader2,
-  Music,
-  Play,
-  Plus,
+  Save,
   ShieldCheck,
-  Trash2,
-  UploadCloud,
-  X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,9 +22,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { RichTextEditor } from "@/components/admin/blog/rich-text-editor";
 import { MediaPickerInput } from "@/components/admin/media/media-picker-input";
+import { ConfirmDialog } from "@/components/admin/shared/confirm-dialog";
+import { ProductChaptersField } from "@/components/admin/products/product-chapters-field";
+import { ProductFilesField } from "@/components/admin/products/product-files-field";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -40,14 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveProductAction } from "@/lib/actions/admin/products";
-import {
-  PRODUCT_FILE_KIND_LABELS,
-} from "@/lib/admin/format";
 import { slugify } from "@/lib/admin/slug";
-import {
-  productSchema,
-  type ProductInput,
-} from "@/lib/validations/admin/product";
+import { productSchema, type ProductInput } from "@/lib/validations/admin/product";
+import { cn } from "@/lib/utils";
 import type {
   Product,
   ProductCategory,
@@ -61,83 +58,59 @@ type ProductWithRelations = Product & {
   files: ProductFile[];
 };
 
-type UploadResponse = {
-  storageKey?: string;
-  filename?: string;
-  size?: number;
-  kind?: "TEXT" | "VIDEO" | "AUDIO";
-  error?: string;
-};
+const SHORT_DESCRIPTION_MAX = 500;
 
-type RowUploadState = {
-  uploading: boolean;
-  progress: number;
-  /** True when the visible stored-file box refers to a fresh upload. */
-  justUploaded: boolean;
-};
-
-const ACCEPTED_PRODUCT_FILES =
-  ".pdf,.docx,.txt,.mp4,.webm,.mp3,.m4a,.ogg,.wav,.png,.jpg,.jpeg,.webp,.gif,.zip,.rar,.7z,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,video/mp4,video/webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,image/png,image/jpeg,image/webp,image/gif,application/zip,application/x-zip-compressed,application/vnd.rar,application/x-rar-compressed,application/x-7z-compressed";
-const PRIVATE_FILE_KEY_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,120}$/;
-const FILE_CONTENT_TYPES: Record<string, string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  txt: "text/plain",
-  mp4: "video/mp4",
-  webm: "video/webm",
-  mp3: "audio/mpeg",
-  m4a: "audio/mp4",
-  ogg: "audio/ogg",
-  wav: "audio/wav",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  gif: "image/gif",
-  zip: "application/zip",
-  rar: "application/vnd.rar",
-  "7z": "application/x-7z-compressed",
-};
-
-const KIND_ICONS = {
-  TEXT: FileText,
-  VIDEO: Play,
-  AUDIO: Music,
-  ARCHIVE: Archive,
-} as const;
-
-function getFileContentType(file: File): string {
-  if (file.type) return file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return FILE_CONTENT_TYPES[extension] ?? "application/octet-stream";
+function Section({
+  title,
+  description,
+  icon,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("rounded-xl border bg-white shadow-xs", className)}>
+      <header className="flex items-start gap-3 border-b px-4 py-3.5 sm:px-5">
+        {icon && (
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4">
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold leading-6">{title}</h2>
+          {description && (
+            <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+          )}
+        </div>
+      </header>
+      <div className="space-y-5 p-4 sm:p-5">{children}</div>
+    </section>
+  );
 }
 
-/** Original file name as shown in the admin UI (client-side helper). */
-function originalNameOf(storageKey: string): string {
-  if (PRIVATE_FILE_KEY_PATTERN.test(storageKey)) {
-    return storageKey.slice(37);
-  }
-  if (
-    storageKey.startsWith("/files/") ||
-    storageKey.startsWith("/uploads/")
-  ) {
-    return storageKey.split("/").pop() ?? storageKey;
-  }
-  return storageKey;
+function toman(value: number) {
+  return `${value.toLocaleString("fa-IR")} تومان`;
 }
 
 export function ProductForm({
   product,
   categories,
+  maxUploadSize,
 }: {
   product?: ProductWithRelations;
   categories: ProductCategory[];
+  maxUploadSize: number;
 }) {
   const router = useRouter();
-  const [rowUploads, setRowUploads] = useState<Record<number, RowUploadState>>(
-    {},
-  );
+  const freshKeysRef = useRef(new Set<string>());
+  const slugTouched = useRef(Boolean(product));
+  const [uploading, setUploading] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   const form = useForm<ProductInput>({
     resolver: standardSchemaResolver(productSchema),
@@ -158,11 +131,12 @@ export function ProductForm({
             title: chapter.title,
             sortOrder: chapter.sortOrder,
           })),
-          files: product.files.map((f) => ({
-            displayName: f.displayName,
-            storageKey: f.storageKey,
-            kind: f.kind,
-            sortOrder: f.sortOrder,
+          files: product.files.map((file) => ({
+            clientId: file.id,
+            displayName: file.displayName,
+            storageKey: file.storageKey,
+            kind: file.kind,
+            sortOrder: file.sortOrder,
           })),
         }
       : {
@@ -182,162 +156,114 @@ export function ProductForm({
         },
   });
 
-  const { fields: chapterFields, append: appendChapter, remove: removeChapter } =
-    useFieldArray({
-      control: form.control,
-      name: "chapters",
-    });
-
-  const {
-    fields: fileFields,
-    append: appendFile,
-    remove: removeFile,
-  } = useFieldArray({
+  const [slug, image, price, discountPrice, shortDescription, isPublished] = useWatch({
     control: form.control,
-    name: "files",
+    name: ["slug", "image", "price", "discountPrice", "shortDescription", "isPublished"],
   });
 
-  const files = form.getValues("files") as ProductInput["files"];
+  const { isDirty, isSubmitting } = form.formState;
+  const isBusy = uploading || isSubmitting;
+  const hasUnsaved = isDirty;
 
-  function setRowUpload(index: number, patch: Partial<RowUploadState>) {
-    setRowUploads((prev) => {
-      const defaults: RowUploadState = {
-        uploading: false,
-        progress: 0,
-        justUploaded: false,
-      };
-      return {
-        ...prev,
-        [index]: { ...defaults, ...prev[index], ...patch },
-      };
-    });
-  }
+  const handleBusyChange = useCallback((busy: boolean) => setUploading(busy), []);
 
-  function uploadFileForRow(rowIndex: number, file: File) {
-    setRowUpload(rowIndex, { uploading: true, progress: 0 });
-
-    const request = new XMLHttpRequest();
-    request.open("POST", "/api/admin/products/upload");
-    request.setRequestHeader("Content-Type", getFileContentType(file));
-    request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
-
-    request.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable) {
-        setRowUpload(rowIndex, {
-          progress: Math.round((event.loaded / event.total) * 100),
-        });
-      }
-    });
-
-    request.addEventListener("load", () => {
-      let response: UploadResponse = {};
-      try {
-        response = JSON.parse(request.responseText) as UploadResponse;
-      } catch {
-        response = {};
-      }
-
-      if (
-        request.status < 200 ||
-        request.status >= 300 ||
-        !response.storageKey ||
-        !response.kind
-      ) {
-        setRowUpload(rowIndex, { uploading: false, progress: 0 });
-        toast.error(response.error ?? "آپلود فایل ناموفق بود");
-        return;
-      }
-
-      form.setValue(`files.${rowIndex}.storageKey`, response.storageKey, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-      form.setValue(`files.${rowIndex}.kind`, response.kind, {
-        shouldValidate: true,
-      });
-      const currentName = form.getValues(`files.${rowIndex}.displayName`)?.trim();
-      if (!currentName) {
-        form.setValue(
-          `files.${rowIndex}.displayName`,
-          response.filename ?? file.name,
-          { shouldDirty: true },
-        );
-      }
-
-      setRowUpload(rowIndex, {
-        uploading: false,
-        progress: 100,
-        justUploaded: true,
-      });
-      toast.success("فایل با موفقیت و به‌صورت امن آپلود شد");
-    });
-
-    request.addEventListener("error", () => {
-      setRowUpload(rowIndex, { uploading: false, progress: 0 });
-      toast.error("ارتباط هنگام آپلود قطع شد؛ دوباره تلاش کنید");
-    });
-
-    request.addEventListener("abort", () => {
-      setRowUpload(rowIndex, { uploading: false, progress: 0 });
-      toast.error("آپلود فایل متوقف شد");
-    });
-
-    request.send(file);
-  }
-
-  function handleRowFileChange(index: number, event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) uploadFileForRow(index, file);
-    event.target.value = "";
-  }
-
-  function handleRemoveFile(index: number) {
-    removeFile(index);
-    setRowUploads((prev) => {
-      const next = { ...prev };
-      delete next[index];
-      return next;
-    });
-  }
+  // Warn before closing the tab with unsaved changes or running uploads.
+  useEffect(() => {
+    if (!hasUnsaved && !uploading) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved, uploading]);
 
   async function onSubmit(values: ProductInput) {
-    if (Object.values(rowUploads).some((s) => s.uploading)) {
+    if (uploading) {
       toast.error("تا پایان آپلود فایل‌ها منتظر بمانید");
       return;
     }
 
-    const result = await saveProductAction(values, product?.id);
+    const payload: ProductInput = {
+      ...values,
+      slug: values.slug.trim(),
+      chapters: values.chapters.map((chapter, index) => ({
+        title: chapter.title.trim(),
+        sortOrder: index,
+      })),
+      files: values.files.map((file, index) => ({
+        displayName: file.displayName.trim(),
+        storageKey: file.storageKey,
+        kind: file.kind,
+        sortOrder: index,
+      })),
+    };
+
+    const result = await saveProductAction(payload, product?.id);
     if (!result.success) {
       toast.error(result.error);
       return;
     }
+    freshKeysRef.current.clear();
+    form.reset(values);
     toast.success(product ? "پکیج به‌روزرسانی شد" : "پکیج ایجاد شد");
     router.push("/admins/products");
     router.refresh();
   }
 
-  const anyRowUploading = Object.values(rowUploads).some((s) => s.uploading);
-  const isBusy = anyRowUploading || form.formState.isSubmitting;
+  function onInvalid() {
+    toast.error("برخی فیلدها نیاز به اصلاح دارند");
+  }
+
+  function discardAndLeave() {
+    for (const key of freshKeysRef.current) {
+      void fetch(`/api/admin/products/upload?key=${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+    freshKeysRef.current.clear();
+    setLeaveOpen(false);
+    router.push("/admins/products");
+  }
+
+  function handleCancel() {
+    if (hasUnsaved || uploading) setLeaveOpen(true);
+    else router.push("/admins/products");
+  }
+
+  const discountPercent =
+    price && discountPrice != null && discountPrice < price
+      ? Math.round(((price - discountPrice) / price) * 100)
+      : null;
+  const shortLength = shortDescription?.length ?? 0;
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <section className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+      <form
+        onSubmit={(event) => form.handleSubmit(onSubmit, onInvalid)(event)}
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+        noValidate
+      >
+        {/* ---------- Main column ---------- */}
+        <div className="min-w-0 space-y-6">
+          <Section title="اطلاعات پایه" description="عنوان و معرفی کوتاه پکیج">
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>عنوان</FormLabel>
+                  <FormLabel>عنوان پکیج</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
+                      placeholder="مثلاً: دورهٔ جامع مهارت‌های ارتباطی"
                       disabled={isBusy}
                       onChange={(event) => {
                         field.onChange(event);
-                        if (!product) {
-                          form.setValue("slug", slugify(event.target.value));
+                        if (!slugTouched.current) {
+                          form.setValue("slug", slugify(event.target.value), {
+                            shouldValidate: form.formState.isSubmitted,
+                          });
                         }
                       }}
                     />
@@ -346,458 +272,254 @@ export function ProductForm({
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="slug"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Slug</FormLabel>
+                  <FormLabel>نامک (Slug)</FormLabel>
+                  <div
+                    dir="ltr"
+                    className="flex h-9 items-center overflow-hidden rounded-md border bg-transparent shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:border-destructive"
+                  >
+                    <span className="flex h-full shrink-0 items-center border-e bg-muted/50 px-3 text-xs text-muted-foreground">
+                      /products/
+                    </span>
+                    <FormControl>
+                      <input
+                        {...field}
+                        disabled={isBusy}
+                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none disabled:opacity-50"
+                        onChange={(event) => {
+                          slugTouched.current = true;
+                          field.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          field.onBlur();
+                          const normalized = slugify(event.target.value);
+                          if (normalized && normalized !== event.target.value) {
+                            form.setValue("slug", normalized, { shouldDirty: true });
+                          }
+                        }}
+                      />
+                    </FormControl>
+                  </div>
+                  <FormDescription>آدرس صفحهٔ پکیج در سایت؛ از عنوان ساخته می‌شود.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="shortDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>توضیح کوتاه</FormLabel>
+                    <span
+                      className={cn(
+                        "text-xs tabular-nums text-muted-foreground",
+                        shortLength > SHORT_DESCRIPTION_MAX && "text-destructive",
+                      )}
+                    >
+                      {shortLength.toLocaleString("fa-IR")} / {SHORT_DESCRIPTION_MAX.toLocaleString("fa-IR")}
+                    </span>
+                  </div>
                   <FormControl>
-                    <Input {...field} dir="ltr" disabled={isBusy} />
+                    <Textarea
+                      {...field}
+                      rows={3}
+                      className="resize-y"
+                      placeholder="خلاصه‌ای که در کارت پکیج و نتایج جستجو نمایش داده می‌شود"
+                      disabled={isBusy}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
+          </Section>
 
-          <FormField
-            control={form.control}
-            name="shortDescription"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>توضیح کوتاه</FormLabel>
-                <FormControl>
-                  <Textarea {...field} rows={3} disabled={isBusy} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <Section title="توضیحات کامل" description="معرفی کامل پکیج با تیتر، تصویر، جدول و لینک">
+            <FormField
+              control={form.control}
+              name="fullDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <RichTextEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={isBusy}
+                      placeholder="توضیحات کامل پکیج را بنویسید…"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </Section>
 
-          <FormField
-            control={form.control}
-            name="fullDescription"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>توضیحات کامل</FormLabel>
-                <FormControl>
-                  <RichTextEditor
-                    value={field.value}
-                    onChange={field.onChange}
-                    disabled={isBusy}
-                    placeholder="توضیحات کامل پکیج را با تیتر، تصویر، جدول، لینک و قالب‌بندی دلخواه بنویسید…"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </section>
+          <Section title="سرفصل‌ها" description="فهرست مطالبی که در این پکیج آموزش داده می‌شود">
+            <ProductChaptersField form={form} disabled={isBusy} />
+          </Section>
 
-        <section className="space-y-6 border-t pt-8">
-          <div className="grid gap-6 sm:grid-cols-2">
+          <Section
+            title="فایل‌های پکیج"
+            description="سند، PDF، ویدیو، صوت و فایل فشرده — نوع هر فایل خودکار تشخیص داده می‌شود"
+          >
+            <div className="flex items-start gap-2.5 rounded-lg bg-emerald-50 px-3 py-2.5 text-xs leading-6 text-emerald-900">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+              <p>
+                فایل‌ها در فضای خصوصی سرور ذخیره می‌شوند و لینک مستقیم ندارند؛ فقط
+                خریدار با لینک اختصاصی و زمان‌دار می‌تواند آن‌ها را دانلود کند.
+              </p>
+            </div>
+            <ProductFilesField
+              form={form}
+              disabled={isSubmitting}
+              maxUploadSize={maxUploadSize}
+              freshKeysRef={freshKeysRef}
+              onBusyChange={handleBusyChange}
+            />
+          </Section>
+        </div>
+
+        {/* ---------- Sidebar ---------- */}
+        <aside className="min-w-0 space-y-6">
+          <Section title="انتشار" icon={<Eye />}>
+            <FormField
+              control={form.control}
+              name="isPublished"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <FormLabel>نمایش در سایت</FormLabel>
+                    <FormDescription className="text-xs">
+                      {field.value ? "پکیج برای کاربران قابل مشاهده است" : "پیش‌نویس؛ فقط در پنل دیده می‌شود"}
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isBusy} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isFeatured"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between gap-3 border-t pt-5">
+                  <div className="space-y-0.5">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-amber-500" />
+                      پکیج ویژه
+                    </FormLabel>
+                    <FormDescription className="text-xs">در صفحهٔ اصلی برجسته می‌شود</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isBusy} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </Section>
+
+          <Section title="دسته‌بندی و کاور" icon={<ImageIcon />}>
             <FormField
               control={form.control}
               name="categoryId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>دسته‌بندی</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isBusy}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="انتخاب دسته" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {categories.length === 0 ? (
+                    <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                      هنوز دسته‌ای ساخته نشده.{" "}
+                      <Link href="/admins/products/categories" className="font-medium text-primary underline-offset-4 hover:underline">
+                        ساخت دسته‌بندی
+                      </Link>
+                    </p>
+                  ) : (
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isBusy}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="انتخاب دسته" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="image"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>تصویر کاور</FormLabel>
+                  <div className="relative aspect-video overflow-hidden rounded-lg border bg-muted/40">
+                    {image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={image} alt="پیش‌نمایش کاور" className="size-full object-cover" />
+                    ) : (
+                      <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                        <ImageIcon className="size-6" />
+                        <span className="text-xs">تصویری انتخاب نشده</span>
+                      </div>
+                    )}
+                  </div>
                   <FormControl>
-                    <MediaPickerInput
-                      {...field}
-                      onValueChange={field.onChange}
-                      disabled={isBusy}
-                    />
+                    <MediaPickerInput {...field} onValueChange={field.onChange} disabled={isBusy} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
+          </Section>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="isFeatured"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border bg-white p-4">
-                  <FormLabel>پکیج ویژه</FormLabel>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isBusy}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="isPublished"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border bg-white p-4">
-                  <FormLabel>منتشر شده</FormLabel>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isBusy}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
-
-        <section className="space-y-4 border-t pt-8">
-          <div className="flex items-center justify-between">
-            <FormLabel>سرفصل‌ها</FormLabel>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isBusy}
-              onClick={() => appendChapter({ title: "", sortOrder: chapterFields.length })}
-            >
-              <Plus className="size-4" />
-              افزودن سرفصل
-            </Button>
-          </div>
-          {chapterFields.map((chapter, index) => (
-            <div key={chapter.id} className="flex gap-3">
-              <FormField
-                control={form.control}
-                name={`chapters.${index}.title`}
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="عنوان سرفصل"
-                        disabled={isBusy}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name={`chapters.${index}.sortOrder`}
-                render={({ field }) => (
-                  <FormItem className="w-24">
-                    <FormControl>
-                      <Input
-                        type="number"
-                        value={field.value}
-                        disabled={isBusy}
-                        onChange={(event) =>
-                          field.onChange(event.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={chapterFields.length <= 1 || isBusy}
-                onClick={() => removeChapter(index)}
-              >
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
-        </section>
-
-        <section className="space-y-6 border-t pt-8">
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
-            <div className="flex items-center gap-2 font-medium text-primary">
-              <ShieldCheck className="size-5" />
-              نگهداری خصوصی فایل‌ها
-            </div>
-            <p className="mt-2 leading-6 text-muted-foreground">
-              فایل‌ها خارج از پوشهٔ عمومی ذخیره می‌شوند. لینک مستقیم دانلود
-              وجود ندارد؛ فقط خریدار، با لینک اختصاصی و زمان‌محدود (پیش‌فرض ۴
-              ساعت) می‌تواند هر فایل را دانلود کند.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <FormLabel>فایل‌های پکیج</FormLabel>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isBusy}
-                onClick={() =>
-                  appendFile({
-                    displayName: "",
-                    storageKey: "",
-                    kind: "TEXT",
-                    sortOrder: fileFields.length,
-                  })
-                }
-              >
-                <Plus className="size-4" />
-                افزودن فایل
-              </Button>
-            </div>
-
-            {files.length === 0 && (
-              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-                حداقل یک فایل برای پکیج لازم است. فایل‌های متن (PDF، Word،
-                TXT)، ویدیو (MP4، WebM) و صوتی (MP3، M4A، OGG، WAV) مجازند؛
-                نوع فایل هنگام آپلود به‌صورت خودکار تشخیص داده می‌شود.
-              </p>
-            )}
-
-            {fileFields.map((fileField, index) => {
-              const row = files[index];
-              const state = rowUploads[index];
-              const KindIcon = row?.kind
-                ? KIND_ICONS[row.kind]
-                : FileText;
-              const storedKey = row?.storageKey;
-              const hasStoredFile = Boolean(storedKey);
-
-              return (
-                <div
-                  key={fileField.id}
-                  className="space-y-4 rounded-xl border bg-white p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">فایل {index + 1}</span>
-                      {row?.kind && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                          <KindIcon className="size-3.5" />
-                          {PRODUCT_FILE_KIND_LABELS[row.kind]}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={fileFields.length <= 1 || isBusy}
-                      onClick={() => handleRemoveFile(index)}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
-                    <FormField
-                      control={form.control}
-                      name={`files.${index}.displayName`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>نام نمایشی</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="عنوانی که در سایت نمایش داده می‌شود"
-                              disabled={isBusy}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`files.${index}.sortOrder`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ترتیب</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              value={field.value}
-                              disabled={isBusy}
-                              onChange={(event) =>
-                                field.onChange(event.target.valueAsNumber || 0)
-                              }
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name={`files.${index}.storageKey`}
-                    render={() => (
-                      <FormItem>
-                        <FormLabel>فایل اصلی</FormLabel>
-                        <FormControl>
-                          <div className="space-y-3">
-                            {hasStoredFile && !state?.uploading && (
-                              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
-                                <CheckCircle2 className="size-5 shrink-0" />
-                                <div className="min-w-0 flex-1 text-sm">
-                                  <p className="truncate font-medium">
-                                    {originalNameOf(storedKey!)}
-                                  </p>
-                                  <p className="text-xs opacity-80">
-                                    {state?.justUploaded
-                                      ? "آمادهٔ ذخیره — پس از ذخیرهٔ پکیج فعال می‌شود"
-                                      : "ذخیره‌شده در فضای خصوصی"}
-                                  </p>
-                                </div>
-                                <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100">
-                                  <UploadCloud className="size-3.5" />
-                                  جایگزینی فایل
-                                  <input
-                                    type="file"
-                                    className="sr-only"
-                                    accept={ACCEPTED_PRODUCT_FILES}
-                                    disabled={isBusy}
-                                    onChange={(event) =>
-                                      handleRowFileChange(index, event)
-                                    }
-                                  />
-                                </label>
-                              </div>
-                            )}
-
-                            {(state?.uploading || !hasStoredFile) && (
-                              <div>
-                                <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/20 px-4 py-4 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
-                                  <input
-                                    type="file"
-                                    className="sr-only"
-                                    accept={ACCEPTED_PRODUCT_FILES}
-                                    disabled={isBusy}
-                                    onChange={(event) =>
-                                      handleRowFileChange(index, event)
-                                    }
-                                  />
-                                  {state?.uploading ? (
-                                    <Loader2
-                                      className="mb-2 size-7 animate-spin text-primary"
-                                    />
-                                  ) : (
-                                    <UploadCloud className="mb-2 size-7 text-primary" />
-                                  )}
-                                  <span className="text-sm font-medium">
-                                    {state?.uploading
-                                      ? "فایل در حال آپلود است…"
-                                      : hasStoredFile
-                                        ? "فایل جدید را انتخاب کنید"
-                                        : "انتخاب فایل (PDF، ویدیو، صوتی)"}
-                                  </span>
-                                  <span className="mt-1 text-xs text-muted-foreground">
-                                    PDF، Word، TXT، MP4، WebM، MP3، M4A، OGG یا WAV
-                                  </span>
-                                </label>
-
-                                {state?.uploading && (
-                                  <div
-                                    className="mt-3 space-y-2 rounded-lg border bg-white p-3"
-                                    role="status"
-                                    aria-live="polite"
-                                  >
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span>در حال انتقال فایل؛ صفحه را نبندید</span>
-                                      <span className="font-semibold text-primary">
-                                        {state.progress}٪
-                                      </span>
-                                    </div>
-                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                      <div
-                                        className="h-full rounded-full bg-primary transition-[width] duration-300"
-                                        style={{ width: `${state.progress}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {hasStoredFile && state?.uploading && (
-                              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <X className="size-3" />
-                                فایل فعلی با فایل جدید جایگزین می‌شود
-                              </p>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              );
-            })}
-
-            <p className="text-xs leading-6 text-muted-foreground">
-              نوع هر فایل هنگام آپلود به‌طور خودکار شناسایی می‌شود و قابل
-              ویرایش دستی نیست. فایل‌های آرشیوی قدیمی (ZIP/RAR/7Z) فقط در
-              حالت جایگزینی نمایش داده می‌شوند و قابل آپلود جدید نیستند.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2">
+          <Section title="قیمت‌گذاری">
             <FormField
               control={form.control}
               name="price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>قیمت (تومان)</FormLabel>
+                  <FormLabel>قیمت اصلی</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ?? ""}
-                      disabled={isBusy}
-                      onChange={(event) =>
-                        field.onChange(
-                          event.target.value === ""
-                            ? null
-                            : event.target.valueAsNumber,
-                        )
-                      }
-                      placeholder="خالی = رایگان"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        dir="ltr"
+                        className="pl-14"
+                        value={field.value ?? ""}
+                        disabled={isBusy}
+                        placeholder="0"
+                        onChange={(event) => {
+                          const next = event.target.value === "" ? null : event.target.valueAsNumber;
+                          field.onChange(next);
+                          if (!next && form.getValues("discountPrice") != null) {
+                            form.setValue("discountPrice", null, { shouldDirty: true });
+                          }
+                        }}
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted-foreground">
+                        تومان
+                      </span>
+                    </div>
                   </FormControl>
+                  <FormDescription className="text-xs">خالی بگذارید تا پکیج رایگان باشد.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -807,47 +529,119 @@ export function ProductForm({
               name="discountPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>قیمت با تخفیف (تومان)</FormLabel>
+                  <FormLabel>قیمت با تخفیف</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ?? ""}
-                      disabled={isBusy}
-                      onChange={(event) =>
-                        field.onChange(
-                          event.target.value === ""
-                            ? null
-                            : event.target.valueAsNumber,
-                        )
-                      }
-                    />
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        dir="ltr"
+                        className="pl-14"
+                        value={field.value ?? ""}
+                        disabled={isBusy || !price}
+                        placeholder="اختیاری"
+                        onChange={(event) =>
+                          field.onChange(event.target.value === "" ? null : event.target.valueAsNumber)
+                        }
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted-foreground">
+                        تومان
+                      </span>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
-        </section>
 
-        <div className="flex gap-3 border-t pt-6">
-          <Button type="submit" disabled={isBusy}>
-            {isBusy && <Loader2 className="size-4 animate-spin" />}
-            {anyRowUploading
-              ? "در حال آپلود فایل‌ها…"
-              : form.formState.isSubmitting
-                ? "در حال ذخیره…"
-                : "ذخیره پکیج"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isBusy}
-            onClick={() => router.back()}
-          >
-            انصراف
-          </Button>
+            <div className="rounded-lg bg-muted/50 p-3 text-sm">
+              <p className="mb-1 text-xs text-muted-foreground">قیمت نهایی برای کاربر</p>
+              {!price ? (
+                <p className="font-semibold text-emerald-700">رایگان</p>
+              ) : discountPercent !== null ? (
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-semibold">{toman(discountPrice!)}</span>
+                  <span className="text-xs text-muted-foreground line-through">{toman(price)}</span>
+                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                    {discountPercent.toLocaleString("fa-IR")}٪ تخفیف
+                  </span>
+                </div>
+              ) : (
+                <p className="font-semibold">{toman(price)}</p>
+              )}
+            </div>
+          </Section>
+        </aside>
+
+        {/* ---------- Sticky action bar ---------- */}
+        <div className="sticky bottom-0 z-20 -mb-4 pb-4 md:-mb-6 md:pb-6 lg:col-span-2 lg:-mb-8 lg:pb-8">
+          <div className="flex flex-col gap-3 rounded-xl border bg-white/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              {uploading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  در حال آپلود فایل‌ها…
+                </>
+              ) : Object.keys(form.formState.errors).length > 0 && form.formState.isSubmitted ? (
+                <>
+                  <AlertCircle className="size-4 text-destructive" />
+                  <span className="text-destructive">برخی فیلدها نیاز به اصلاح دارند</span>
+                </>
+              ) : hasUnsaved ? (
+                <>
+                  <span className="size-2 rounded-full bg-amber-500" />
+                  تغییرات ذخیره نشده‌اند
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                  {product ? "همه تغییرات ذخیره شده است" : "اطلاعات پکیج را وارد کنید"}
+                </>
+              )}
+              {slug && isPublished && product && !hasUnsaved && (
+                <Link
+                  href={`/products/${slug}`}
+                  target="_blank"
+                  className="hidden text-xs text-primary underline-offset-4 hover:underline sm:inline"
+                >
+                  مشاهده در سایت
+                </Link>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                disabled={isSubmitting}
+                onClick={handleCancel}
+              >
+                انصراف
+              </Button>
+              <Button type="submit" className="flex-1 sm:min-w-36 sm:flex-none" disabled={isBusy}>
+                {isBusy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {uploading ? "در حال آپلود…" : isSubmitting ? "در حال ذخیره…" : product ? "ذخیره تغییرات" : "ایجاد پکیج"}
+              </Button>
+            </div>
+          </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        title="خروج بدون ذخیره؟"
+        description={
+          uploading
+            ? "آپلود برخی فایل‌ها هنوز تمام نشده است. با خروج، آپلودها لغو و تغییرات ذخیره‌نشده از بین می‌روند."
+            : "تغییرات ذخیره‌نشده و فایل‌های تازه آپلودشده حذف خواهند شد."
+        }
+        confirmLabel="خروج"
+        cancelLabel="ادامهٔ ویرایش"
+        variant="destructive"
+        onConfirm={discardAndLeave}
+      />
     </Form>
   );
 }

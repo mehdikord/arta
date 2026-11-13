@@ -137,13 +137,14 @@ export function RichTextEditor({
   async function uploadImage(file: File) {
     if (!editor) return;
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
       const response = await fetch("/api/admin/upload", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-File-Name": encodeURIComponent(file.name),
+        },
+        body: file,
       });
       const data = (await response.json()) as { url?: string; error?: string };
       if (!response.ok || !data.url) {

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { PAGINATION_OPTIONS } from "@/lib/admin/constants";
 
+const fa = (n: number) => n.toLocaleString("fa-IR");
+
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
 }
@@ -27,9 +29,9 @@ export function DataTablePagination<TData>({
   return (
     <div className="flex flex-col gap-4 px-2 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
-        {table.getFilteredRowModel().rows.length} مورد
+        {fa(table.getFilteredRowModel().rows.length)} مورد
         {table.getFilteredSelectedRowModel().rows.length > 0 &&
-          ` — ${table.getFilteredSelectedRowModel().rows.length} انتخاب‌شده`}
+          ` — ${fa(table.getFilteredSelectedRowModel().rows.length)} انتخاب‌شده`}
       </p>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -39,13 +41,13 @@ export function DataTablePagination<TData>({
             value={`${table.getState().pagination.pageSize}`}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
-            <SelectTrigger className="h-8 w-[70px]">
+            <SelectTrigger className="h-8 w-[70px]" aria-label="تعداد ردیف در هر صفحه">
               <SelectValue />
             </SelectTrigger>
             <SelectContent side="top">
               {PAGINATION_OPTIONS.map((size) => (
                 <SelectItem key={size} value={`${size}`}>
-                  {size}
+                  {fa(size)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -54,14 +56,15 @@ export function DataTablePagination<TData>({
 
         <div className="flex items-center gap-1">
           <span className="text-sm text-muted-foreground">
-            صفحه {table.getState().pagination.pageIndex + 1} از{" "}
-            {table.getPageCount() || 1}
+            صفحه {fa(table.getState().pagination.pageIndex + 1)} از{" "}
+            {fa(table.getPageCount() || 1)}
           </span>
           <Button
             type="button"
             variant="outline"
             size="icon"
             className="size-8"
+            aria-label="صفحهٔ اول"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
           >
@@ -72,6 +75,7 @@ export function DataTablePagination<TData>({
             variant="outline"
             size="icon"
             className="size-8"
+            aria-label="صفحهٔ قبل"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
@@ -82,6 +86,7 @@ export function DataTablePagination<TData>({
             variant="outline"
             size="icon"
             className="size-8"
+            aria-label="صفحهٔ بعد"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
@@ -92,6 +97,7 @@ export function DataTablePagination<TData>({
             variant="outline"
             size="icon"
             className="size-8"
+            aria-label="صفحهٔ آخر"
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
           >

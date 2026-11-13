@@ -57,7 +57,7 @@ export function ProductCategoriesPageClient({
     {
       id: "products",
       header: "تعداد پکیج",
-      cell: ({ row }) => row.original._count.products,
+      cell: ({ row }) => row.original._count.products.toLocaleString("fa-IR"),
     },
   ];
 

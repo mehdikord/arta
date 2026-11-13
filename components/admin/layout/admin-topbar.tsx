@@ -104,7 +104,7 @@ export function AdminTopbar({ newContactsCount = 0 }: { newContactsCount?: numbe
             </span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col gap-0.5">
               <span>{admin.name}</span>

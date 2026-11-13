@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals-admin.css";
+import { AdminDirectionProvider } from "@/components/admin/layout/admin-direction-provider";
 
 export const metadata: Metadata = {
   title: "پنل مدیریت",
@@ -12,8 +13,8 @@ export default function AdminRootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="admin-panel h-dvh min-h-0 overflow-hidden" dir="rtl">
-      {children}
+    <div className="admin-panel relative h-dvh min-h-0 overflow-hidden" dir="rtl">
+      <AdminDirectionProvider>{children}</AdminDirectionProvider>
     </div>
   );
 }

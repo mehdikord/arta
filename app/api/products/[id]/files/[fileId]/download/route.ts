@@ -9,6 +9,7 @@ import {
   resolveProductFileLocation,
 } from "@/lib/product-files";
 import { verifyProductFileDownloadToken } from "@/lib/product-file-links";
+import { getFileExtension } from "@/lib/product-file-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,19 @@ function contentDisposition(filename: string): string {
     .replace(/[^\x20-\x7E]/g, "_")
     .replace(/["\\]/g, "_");
   return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+/** Friendly download name: the package file's display name + real extension. */
+function downloadFilename(displayName: string, storedName: string): string {
+  const extension = getFileExtension(storedName);
+  const stem = displayName
+    .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 150);
+  if (!stem) return storedName;
+  if (!extension || stem.toLowerCase().endsWith(`.${extension}`)) return stem;
+  return `${stem}.${extension}`;
 }
 
 function parseRange(rangeHeader: string, fileSize: number) {
@@ -112,7 +126,7 @@ export async function GET(
     return jsonError("فایل پکیج یافت نشد", 404);
   }
 
-  const filename = getOriginalFilename(file.storageKey);
+  const filename = downloadFilename(file.displayName, getOriginalFilename(file.storageKey));
   const baseHeaders = {
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-store, max-age=0",

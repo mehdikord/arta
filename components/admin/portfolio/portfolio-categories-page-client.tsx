@@ -57,7 +57,7 @@ export function PortfolioCategoriesPageClient({
     {
       id: "items",
       header: "تعداد",
-      cell: ({ row }) => row.original._count.items,
+      cell: ({ row }) => row.original._count.items.toLocaleString("fa-IR"),
     },
   ];
 

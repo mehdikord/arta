@@ -2,64 +2,20 @@ import "server-only";
 
 import path from "node:path";
 import { mkdir, stat, unlink } from "node:fs/promises";
+import {
+  getFileExtension,
+  getProductFileTypeInfo,
+} from "@/lib/product-file-types";
+import { prisma } from "@/lib/prisma";
+import { parseProductUploadMaxSizeGb } from "@/lib/product-upload-limit";
+import {
+  DEFAULT_PRODUCT_UPLOAD_MAX_SIZE_GB,
+  PRODUCT_UPLOAD_MAX_SIZE_SETTING_KEY,
+} from "@/lib/validations/admin/site-settings";
 
-const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024;
+const GIGABYTE = 1024 * 1024 * 1024;
 const STORAGE_KEY_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,120}$/;
-
-export const PRODUCT_FILE_TYPES: Record<string, string> = {
-  "application/pdf": ".pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    ".docx",
-  "text/plain": ".txt",
-  "video/mp4": ".mp4",
-  "video/webm": ".webm",
-  "audio/mpeg": ".mp3",
-  "audio/mp4": ".m4a",
-  "audio/ogg": ".ogg",
-  "audio/wav": ".wav",
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-  "application/zip": ".zip",
-  "application/x-zip-compressed": ".zip",
-  "application/vnd.rar": ".rar",
-  "application/x-rar-compressed": ".rar",
-  "application/x-7z-compressed": ".7z",
-};
-
-/** Kinds that the upload route can produce (ARCHIVE is legacy-only). */
-export type UploadableProductFileKind = "TEXT" | "VIDEO" | "AUDIO" | "ARCHIVE";
-
-const PRODUCT_FILE_KINDS_BY_MIME: Record<string, UploadableProductFileKind> = {
-  "application/pdf": "TEXT",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    "TEXT",
-  "text/plain": "TEXT",
-  "video/mp4": "VIDEO",
-  "video/webm": "VIDEO",
-  "audio/mpeg": "AUDIO",
-  "audio/mp4": "AUDIO",
-  "audio/ogg": "AUDIO",
-  "audio/wav": "AUDIO",
-  "image/png": "TEXT",
-  "image/jpeg": "TEXT",
-  "image/webp": "TEXT",
-  "image/gif": "TEXT",
-  "application/zip": "ARCHIVE",
-  "application/x-zip-compressed": "ARCHIVE",
-  "application/vnd.rar": "ARCHIVE",
-  "application/x-rar-compressed": "ARCHIVE",
-  "application/x-7z-compressed": "ARCHIVE",
-};
-
-/** Auto-detect the file kind from the uploaded MIME type. */
-export function detectProductFileKind(
-  contentType: string,
-): UploadableProductFileKind | null {
-  return PRODUCT_FILE_KINDS_BY_MIME[contentType.toLowerCase()] ?? null;
-}
 
 /** Legacy public URL prefixes allowed inside product_files.storage_key. */
 const LEGACY_PUBLIC_PREFIXES = ["/files/", "/uploads/"] as const;
@@ -138,42 +94,10 @@ export function getOriginalFilename(storageKey: string): string {
 
 /** MIME type for delivery, derived from the file extension. */
 export function getProductFileContentType(storageKey: string): string {
-  const ext = path.extname(getOriginalFilename(storageKey)).toLowerCase();
-  switch (ext) {
-    case ".pdf":
-      return "application/pdf";
-    case ".mp4":
-      return "video/mp4";
-    case ".webm":
-      return "video/webm";
-    case ".mp3":
-      return "audio/mpeg";
-    case ".m4a":
-      return "audio/mp4";
-    case ".ogg":
-      return "audio/ogg";
-    case ".wav":
-      return "audio/wav";
-    case ".docx":
-      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    case ".txt":
-      return "text/plain";
-    case ".gif":
-      return "image/gif";
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    case ".rar":
-      return "application/vnd.rar";
-    case ".7z":
-      return "application/x-7z-compressed";
-    default:
-      return "application/octet-stream";
-  }
+  return (
+    getProductFileTypeInfo(getOriginalFilename(storageKey))?.mime ??
+    "application/octet-stream"
+  );
 }
 
 export function getProductFileStorageRoot(): string {
@@ -184,24 +108,40 @@ export function getProductFileStorageRoot(): string {
   );
 }
 
-export function getProductFileMaxSize(): number {
-  const configuredMegabytes = Number(process.env.PRODUCT_FILE_MAX_SIZE_MB);
-  if (Number.isFinite(configuredMegabytes) && configuredMegabytes > 0) {
-    return Math.floor(configuredMegabytes * 1024 * 1024);
+/**
+ * Max upload size (bytes) for package files.
+ * Priority: admin setting (Settings → upload limit, in GB) → 1 GB default.
+ */
+export async function getProductFileMaxSize(): Promise<number> {
+  try {
+    const row = await prisma.siteSetting.findUnique({
+      where: { key: PRODUCT_UPLOAD_MAX_SIZE_SETTING_KEY },
+      select: { value: true },
+    });
+    const gb = parseProductUploadMaxSizeGb(row?.value);
+    if (gb !== null) return Math.floor(gb * GIGABYTE);
+  } catch (error) {
+    console.error("Failed to read upload size setting", error);
   }
-  return DEFAULT_MAX_FILE_SIZE;
+  return Math.floor(DEFAULT_PRODUCT_UPLOAD_MAX_SIZE_GB * GIGABYTE);
 }
 
+/**
+ * ASCII-only, path-safe filename used inside the storage key.
+ * The extension is kept as-is (callers validate it against the allowlist).
+ */
 export function sanitizeProductFilename(filename: string): string {
-  const extension = path.extname(filename).toLowerCase();
-  const baseName = path
-    .basename(filename, extension)
+  const base = filename.split(/[\\/]/).pop() ?? "";
+  const extension = getFileExtension(base);
+  const stem = extension ? base.slice(0, -(extension.length + 1)) : base;
+  const safeStem = stem
     .normalize("NFKD")
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_+/g, "_")
     .replace(/^[._-]+|[._-]+$/g, "")
     .slice(0, 90);
-  return `${baseName || "package"}${extension}`.slice(0, 120);
+  const safeExtension = extension.replace(/[^a-z0-9]/g, "");
+  return `${safeStem || "package"}${safeExtension ? `.${safeExtension}` : ""}`.slice(0, 120);
 }
 
 export function isValidProductStorageKey(storageKey: string): boolean {

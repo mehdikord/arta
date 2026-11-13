@@ -57,7 +57,7 @@ export function BlogCategoriesPageClient({
     {
       id: "posts",
       header: "تعداد مقاله",
-      cell: ({ row }) => row.original._count.posts,
+      cell: ({ row }) => row.original._count.posts.toLocaleString("fa-IR"),
     },
   ];
 

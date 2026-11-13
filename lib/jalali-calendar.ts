@@ -69,7 +69,7 @@ export function isSameJalaliDay(
 }
 
 export function formatJalaliMonthYear(year: number, month: number): string {
-  return `${JALALI_MONTHS[month - 1]} ${year.toLocaleString("fa-IR")}`;
+  return `${JALALI_MONTHS[month - 1]} ${year.toLocaleString("fa-IR", { useGrouping: false })}`;
 }
 
 export function formatJalaliDay(day: number): string {

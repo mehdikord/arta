@@ -108,7 +108,7 @@ export function DataTable<TData, TValue>({
                     <span className="sr-only">عملیات</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
+                <DropdownMenuContent align="end">
                   <DropdownMenuLabel>عملیات</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {rowActions.map((action) => (

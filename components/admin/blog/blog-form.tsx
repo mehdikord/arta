@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { JalaliDateInput } from "@/components/admin/shared/jalali-date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { RichTextEditor } from "@/components/admin/blog/rich-text-editor";
@@ -239,7 +240,12 @@ export function BlogForm({
               <FormItem>
                 <FormLabel>تاریخ انتشار</FormLabel>
                 <FormControl>
-                  <Input {...field} type="date" dir="ltr" />
+                  <JalaliDateInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    disabled={field.disabled}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

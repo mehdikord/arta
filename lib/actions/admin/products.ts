@@ -50,8 +50,32 @@ export async function saveProductAction(
     return actionError(parsed.error.issues[0]?.message ?? "ورودی نامعتبر");
   }
 
-  const { chapters, files, ...data } = parsed.data;
-  const sortedFiles = [...files].sort((a, b) => a.sortOrder - b.sortOrder);
+  const { chapters, files, ...rest } = parsed.data;
+  const sortedFiles = [...files]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((f) => ({
+      displayName: f.displayName.trim(),
+      storageKey: f.storageKey,
+      kind: f.kind,
+      sortOrder: f.sortOrder,
+    }));
+  // Package-level type badge is derived from the uploaded files.
+  const kinds = new Set(sortedFiles.map((f) => f.kind));
+  const fileType =
+    kinds.size === 1 && kinds.has("VIDEO")
+      ? ("VIDEO" as const)
+      : kinds.size === 1 && kinds.has("TEXT")
+        ? ("PDF" as const)
+        : ("MIXED" as const);
+  const data = { ...rest, fileType };
+
+  const slugOwner = await prisma.product.findFirst({
+    where: { slug: data.slug, ...(id ? { NOT: { id } } : {}) },
+    select: { id: true },
+  });
+  if (slugOwner) {
+    return actionError("این Slug قبلاً برای پکیج دیگری استفاده شده است");
+  }
 
   // Every file referenced by the form must exist on disk before saving.
   for (const file of sortedFiles) {
@@ -104,12 +128,7 @@ export async function saveProductAction(
           create: chapters.map((c) => ({ title: c.title, sortOrder: c.sortOrder })),
         },
         files: {
-          create: sortedFiles.map((f) => ({
-            displayName: f.displayName,
-            storageKey: f.storageKey,
-            kind: f.kind,
-            sortOrder: f.sortOrder,
-          })),
+          create: sortedFiles,
         },
       },
     });

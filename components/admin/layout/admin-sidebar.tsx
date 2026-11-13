@@ -54,7 +54,7 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        "admin-sidebar flex h-full shrink-0 flex-col border-s border-[var(--admin-sidebar-border)] transition-[width] duration-200 ease-in-out",
+        "admin-sidebar flex h-full shrink-0 flex-col border-e border-[var(--admin-sidebar-border)] transition-[width] duration-200 ease-in-out",
         collapsed
           ? "w-[var(--admin-sidebar-collapsed-width)]"
           : "w-[var(--admin-sidebar-width)]",
@@ -66,17 +66,17 @@ export function AdminSidebar({
           collapsed ? "justify-center px-2" : "gap-3 px-5",
         )}
       >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]">
+          <Shield className="size-5" />
+        </div>
         {!collapsed && (
-          <div className="min-w-0 flex-1 text-end">
+          <div className="min-w-0 flex-1 text-start">
             <p className="truncate text-sm font-bold text-white">آرتا</p>
             <p className="truncate text-xs text-[var(--admin-sidebar-text)]">
               {ADMIN_PANEL_NAME}
             </p>
           </div>
         )}
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]">
-          <Shield className="size-5" />
-        </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1 px-3 py-4">
@@ -84,7 +84,7 @@ export function AdminSidebar({
           {sections.map((section) => (
             <div key={section.group}>
               {!collapsed && (
-                <p className="mb-2 px-3 text-end text-[11px] font-semibold tracking-wide text-[var(--admin-sidebar-text)]/70 uppercase">
+                <p className="mb-2 px-3 text-start text-[11px] font-semibold tracking-wide text-[var(--admin-sidebar-text)]/70 uppercase">
                   {section.label}
                 </p>
               )}
@@ -110,9 +110,10 @@ export function AdminSidebar({
                       )}
                       onClick={onNavigate}
                     >
+                      <Icon className="size-[18px] shrink-0" />
                       {!collapsed && (
                         <>
-                          <span className="flex-1 truncate text-end text-sm font-medium">
+                          <span className="flex-1 truncate text-start text-sm font-medium">
                             {item.label}
                           </span>
                           {badge !== undefined && badge > 0 && (
@@ -122,7 +123,6 @@ export function AdminSidebar({
                           )}
                         </>
                       )}
-                      <Icon className="size-[18px] shrink-0" />
                     </Link>
                   );
 

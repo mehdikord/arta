@@ -38,12 +38,12 @@ export function UsersPageClient({ users }: { users: UserRow[] }) {
     {
       id: "purchases",
       header: "خریدها",
-      cell: ({ row }) => row.original._count.purchases,
+      cell: ({ row }) => row.original._count.purchases.toLocaleString("fa-IR"),
     },
     {
       id: "appointments",
       header: "نوبت‌ها",
-      cell: ({ row }) => row.original._count.appointments,
+      cell: ({ row }) => row.original._count.appointments.toLocaleString("fa-IR"),
     },
     {
       accessorKey: "createdAt",

@@ -11,7 +11,7 @@ export default async function AdminSettingsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title="تنظیمات سایت"
-        description="اطلاعات تماس و شبکه‌های اجتماعی"
+        description="اطلاعات تماس، شبکه‌های اجتماعی و محدودیت آپلود"
       />
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <SiteSettingsForm settings={settings} />

@@ -4,6 +4,7 @@ import { unlink } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { NextRequest, NextResponse } from "next/server";
+import { isSameOrigin } from "@/lib/admin/request-origin";
 import { getAdminSessionFromCookie } from "@/lib/admin/session";
 import { prisma } from "@/lib/prisma";
 import { formatFileSize, getProductFileTypeInfo } from "@/lib/product-file-types";
@@ -18,11 +19,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isSameOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
 
 function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status });

@@ -6,6 +6,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { isSameOrigin } from "@/lib/admin/request-origin";
 import { getAdminSessionFromCookie } from "@/lib/admin/session";
 import {
   getMediaTypeInfo,
@@ -43,10 +44,7 @@ export async function POST(request: NextRequest) {
   const session = await getAdminSessionFromCookie();
   if (!session) return jsonError("دسترسی غیرمجاز؛ دوباره وارد شوید", 401);
 
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
-    return jsonError("درخواست نامعتبر است", 403);
-  }
+  if (!isSameOrigin(request)) return jsonError("درخواست نامعتبر است", 403);
   if (!request.body) return jsonError("فایل یافت نشد", 400);
 
   let originalName = "";
